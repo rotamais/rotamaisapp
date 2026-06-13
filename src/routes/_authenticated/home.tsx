@@ -2,9 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { RealMap, type LatLng } from "@/components/RealMap";
 import { VehicleCategoryPicker } from "@/components/VehicleCategoryPicker";
+import { SearchingDriver } from "@/components/SearchingDriver";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Briefcase, Home as HomeIcon, Loader2, MapPin, Menu, Search, Star } from "lucide-react";
+import { Briefcase, Home as HomeIcon, Loader2, MapPin, Menu, Search } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { requestRide } from "@/lib/rotamais.functions";
 import { computeRoute, reverseGeocode } from "@/lib/maps.functions";
@@ -15,7 +16,7 @@ export const Route = createFileRoute("/_authenticated/home")({
   component: PassengerHome,
 });
 
-type Stage = "idle" | "destination" | "select" | "searching" | "matched";
+type Stage = "idle" | "destination" | "select" | "searching";
 type Suggestion = { placeId: string; primary: string; secondary: string };
 
 function PassengerHome() {
@@ -30,6 +31,7 @@ function PassengerHome() {
   const [category, setCategory] = useState<VehicleCategory | null>(null);
   const [fare, setFare] = useState<number>(0);
   const [locating, setLocating] = useState(false);
+  const [activeRideId, setActiveRideId] = useState<string | null>(null);
 
   const requestFn = useServerFn(requestRide);
   const reverseFn = useServerFn(reverseGeocode);
