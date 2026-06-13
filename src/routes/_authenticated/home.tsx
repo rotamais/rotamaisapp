@@ -152,7 +152,7 @@ function PassengerHome() {
     if (!originLL || !destLL || !route || !category) return;
     setStage("searching");
     try {
-      await requestFn({
+      const ride = await requestFn({
         data: {
           origin_address: origin,
           origin_lat: originLL.lat,
@@ -167,11 +167,21 @@ function PassengerHome() {
           payment_method: "card",
         },
       });
-      setTimeout(() => setStage("matched"), 2200);
+      setActiveRideId(ride.id);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao solicitar");
       setStage("select");
     }
+  }
+
+  function resetRide() {
+    setActiveRideId(null);
+    setStage("idle");
+    setDestination("");
+    setDestLL(null);
+    setRoute(null);
+    setCategory(null);
+    setSuggestions([]);
   }
 
   return (
