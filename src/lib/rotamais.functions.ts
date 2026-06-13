@@ -15,6 +15,7 @@ const requestRideSchema = z.object({
   duration_min: z.number().int().optional(),
   estimated_fare: z.number().optional(),
   payment_method: z.enum(["cash", "card", "pix", "wallet"]).default("card"),
+  vehicle_category: z.enum(["x", "comfort", "xl", "pet"]).optional(),
   notes: z.string().optional(),
 });
 
