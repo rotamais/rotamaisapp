@@ -167,6 +167,57 @@ export type Database = {
           },
         ]
       }
+      driver_withdrawals: {
+        Row: {
+          amount: number
+          created_at: string
+          driver_id: string
+          id: string
+          notes: string | null
+          processed_at: string | null
+          processed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          driver_id: string
+          id?: string
+          notes?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          driver_id?: string
+          id?: string
+          notes?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_withdrawals_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_withdrawals_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       drivers: {
         Row: {
           bio: string | null
@@ -176,11 +227,13 @@ export type Database = {
           fleet_id: string | null
           id: string
           is_online: boolean
+          is_suspended: boolean
           is_verified: boolean
           license_category: string | null
           license_expires_at: string | null
           license_number: string
           rating: number | null
+          suspended_reason: string | null
           total_trips: number
           updated_at: string
         }
@@ -192,11 +245,13 @@ export type Database = {
           fleet_id?: string | null
           id: string
           is_online?: boolean
+          is_suspended?: boolean
           is_verified?: boolean
           license_category?: string | null
           license_expires_at?: string | null
           license_number: string
           rating?: number | null
+          suspended_reason?: string | null
           total_trips?: number
           updated_at?: string
         }
@@ -208,11 +263,13 @@ export type Database = {
           fleet_id?: string | null
           id?: string
           is_online?: boolean
+          is_suspended?: boolean
           is_verified?: boolean
           license_category?: string | null
           license_expires_at?: string | null
           license_number?: string
           rating?: number | null
+          suspended_reason?: string | null
           total_trips?: number
           updated_at?: string
         }
@@ -337,6 +394,27 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_settings: {
+        Row: {
+          created_at: string
+          id: string
+          platform_fee_percent: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          platform_fee_percent?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          platform_fee_percent?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -347,6 +425,7 @@ export type Database = {
             | null
           full_name: string | null
           id: string
+          is_blocked: boolean
           phone: string | null
           rating: number | null
           total_rides: number
@@ -361,6 +440,7 @@ export type Database = {
             | null
           full_name?: string | null
           id: string
+          is_blocked?: boolean
           phone?: string | null
           rating?: number | null
           total_rides?: number
@@ -375,6 +455,7 @@ export type Database = {
             | null
           full_name?: string | null
           id?: string
+          is_blocked?: boolean
           phone?: string | null
           rating?: number | null
           total_rides?: number
