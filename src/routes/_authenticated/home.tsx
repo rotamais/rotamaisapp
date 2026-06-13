@@ -1,64 +1,189 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { MapMock } from "@/components/MapMock";
+import { useEffect, useRef, useState } from "react";
+import { RealMap, type LatLng } from "@/components/RealMap";
+import { VehicleCategoryPicker } from "@/components/VehicleCategoryPicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Briefcase, Home as HomeIcon, MapPin, Menu, Search, Star } from "lucide-react";
+import { Briefcase, Home as HomeIcon, Loader2, MapPin, Menu, Search, Star } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { requestRide } from "@/lib/rotamais.functions";
+import { computeRoute, reverseGeocode } from "@/lib/maps.functions";
+import type { VehicleCategory } from "@/lib/pricing";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/home")({
   component: PassengerHome,
 });
 
-type Stage = "idle" | "destination" | "searching" | "matched";
+type Stage = "idle" | "destination" | "select" | "searching" | "matched";
+type Suggestion = { placeId: string; primary: string; secondary: string };
 
 function PassengerHome() {
   const [stage, setStage] = useState<Stage>("idle");
   const [origin, setOrigin] = useState("Minha localização");
+  const [originLL, setOriginLL] = useState<LatLng | null>(null);
   const [destination, setDestination] = useState("");
+  const [destLL, setDestLL] = useState<LatLng | null>(null);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [route, setRoute] = useState<{ distance_km: number; duration_min: number; polyline?: string } | null>(null);
+  const [routing, setRouting] = useState(false);
+  const [category, setCategory] = useState<VehicleCategory | null>(null);
+  const [fare, setFare] = useState<number>(0);
+  const [locating, setLocating] = useState(false);
+
   const requestFn = useServerFn(requestRide);
+  const reverseFn = useServerFn(reverseGeocode);
+  const routeFn = useServerFn(computeRoute);
 
-  const estDistance = 6.2;
-  const estFare = 28.9;
-  const estDuration = 14;
+  const sessionTokenRef = useRef<any>(null);
+  const placesReadyRef = useRef(false);
 
-  const handleRequest = async () => {
-    if (!destination.trim()) {
-      toast.error("Informe o destino");
+  // Pega localização atual no mount
+  useEffect(() => {
+    locate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function locate() {
+    if (!navigator.geolocation) {
+      toast.error("Geolocalização indisponível");
       return;
     }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const ll = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setOriginLL(ll);
+        try {
+          const r = await reverseFn({ data: ll });
+          setOrigin(r.address);
+        } catch {
+          /* ignore */
+        }
+        setLocating(false);
+      },
+      (err) => {
+        setLocating(false);
+        toast.error("Permita o acesso à localização para usar o RotaMais");
+        console.warn(err);
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
+
+  async function ensurePlaces() {
+    if (placesReadyRef.current) return;
+    const g = (window as any).google;
+    if (!g?.maps) return;
+    const { AutocompleteSessionToken } = await g.maps.importLibrary("places");
+    sessionTokenRef.current = new AutocompleteSessionToken();
+    placesReadyRef.current = true;
+  }
+
+  async function onDestinationChange(v: string) {
+    setDestination(v);
+    setDestLL(null);
+    setRoute(null);
+    if (v.trim().length < 3) {
+      setSuggestions([]);
+      return;
+    }
+    await ensurePlaces();
+    const g = (window as any).google;
+    if (!g?.maps) return;
+    try {
+      const { AutocompleteSuggestion } = await g.maps.importLibrary("places");
+      const { suggestions: sugs } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+        input: v,
+        sessionToken: sessionTokenRef.current,
+        language: "pt-BR",
+        region: "br",
+        locationBias: originLL
+          ? { center: originLL, radius: 30000 }
+          : undefined,
+      });
+      setSuggestions(
+        (sugs ?? [])
+          .filter((s: any) => s.placePrediction)
+          .slice(0, 5)
+          .map((s: any) => ({
+            placeId: s.placePrediction.placeId,
+            primary: s.placePrediction.mainText?.text ?? s.placePrediction.text?.text ?? "",
+            secondary: s.placePrediction.secondaryText?.text ?? "",
+          })),
+      );
+    } catch (e) {
+      console.warn(e);
+    }
+  }
+
+  async function pickSuggestion(s: Suggestion) {
+    setDestination(`${s.primary}${s.secondary ? `, ${s.secondary}` : ""}`);
+    setSuggestions([]);
+    const g = (window as any).google;
+    const { Place } = await g.maps.importLibrary("places");
+    const place = new Place({ id: s.placeId, requestedLanguage: "pt-BR" });
+    await place.fetchFields({ fields: ["location", "formattedAddress"] });
+    const loc = place.location;
+    const ll = { lat: loc.lat(), lng: loc.lng() };
+    setDestLL(ll);
+    sessionTokenRef.current = null;
+    placesReadyRef.current = false;
+
+    if (!originLL) {
+      toast.error("Sem localização de origem");
+      return;
+    }
+    setRouting(true);
+    try {
+      const r = await routeFn({ data: { origin: originLL, destination: ll } });
+      setRoute(r);
+      setStage("select");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao calcular rota");
+    } finally {
+      setRouting(false);
+    }
+  }
+
+  async function handleRequest() {
+    if (!originLL || !destLL || !route || !category) return;
     setStage("searching");
     try {
       await requestFn({
         data: {
           origin_address: origin,
-          origin_lat: -23.5505,
-          origin_lng: -46.6333,
+          origin_lat: originLL.lat,
+          origin_lng: originLL.lng,
           destination_address: destination,
-          destination_lat: -23.561,
-          destination_lng: -46.656,
-          distance_km: estDistance,
-          duration_min: estDuration,
-          estimated_fare: estFare,
+          destination_lat: destLL.lat,
+          destination_lng: destLL.lng,
+          distance_km: route.distance_km,
+          duration_min: route.duration_min,
+          estimated_fare: fare,
+          vehicle_category: category,
           payment_method: "card",
         },
       });
       setTimeout(() => setStage("matched"), 2200);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao solicitar");
-      setStage("destination");
+      setStage("select");
     }
-  };
+  }
 
   return (
     <div className="relative">
-      {/* Map */}
-      <div className="relative h-[58vh] min-h-[420px] w-full">
-        <MapMock className="h-full w-full" searching={stage === "searching"} pin={{ label: "Você" }} />
-        <header className="absolute inset-x-0 top-0 flex items-center justify-between p-4 pt-[env(safe-area-inset-top)]">
-          <button className="grid size-10 place-items-center rounded-full bg-background shadow-[var(--shadow-soft)]">
+      <div className="relative h-[52vh] min-h-[380px] w-full">
+        <RealMap
+          className="h-full w-full"
+          center={originLL ?? undefined}
+          origin={originLL ?? undefined}
+          destination={destLL ?? undefined}
+          polyline={route?.polyline}
+        />
+        <header className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-4 pt-[env(safe-area-inset-top)]">
+          <button className="pointer-events-auto grid size-10 place-items-center rounded-full bg-background shadow-[var(--shadow-soft)]">
             <Menu className="size-5" />
           </button>
           <span className="rounded-full bg-background px-3 py-1.5 text-xs font-semibold shadow-[var(--shadow-soft)]">
@@ -68,7 +193,6 @@ function PassengerHome() {
         </header>
       </div>
 
-      {/* Sheet */}
       <div className="-mt-8 rounded-t-3xl bg-card p-5 shadow-[var(--shadow-card)]">
         <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-muted" />
 
@@ -76,11 +200,20 @@ function PassengerHome() {
           <>
             <h2 className="text-xl font-extrabold">Para onde vamos?</h2>
             <button
-              onClick={() => setStage("destination")}
+              onClick={async () => {
+                if (!originLL) await locate();
+                setStage("destination");
+              }}
               className="mt-4 flex w-full items-center gap-3 rounded-xl bg-muted px-4 py-3.5 text-left"
             >
-              <Search className="size-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Buscar destino</span>
+              {locating ? (
+                <Loader2 className="size-4 animate-spin text-muted-foreground" />
+              ) : (
+                <Search className="size-4 text-muted-foreground" />
+              )}
+              <span className="text-sm text-muted-foreground">
+                {locating ? "Localizando você…" : "Buscar destino"}
+              </span>
             </button>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <Quick icon={<HomeIcon className="size-4" />} label="Casa" subtitle="Adicionar" />
@@ -92,15 +225,66 @@ function PassengerHome() {
         {stage === "destination" && (
           <div className="space-y-3">
             <h2 className="text-lg font-extrabold">Confirme sua rota</h2>
-            <Field icon="dot-green" value={origin} onChange={setOrigin} />
-            <Field icon="dot-red" value={destination} onChange={setDestination} placeholder="Destino" autoFocus />
-            <div className="rounded-xl bg-muted p-3 text-xs">
-              <div className="flex justify-between"><span>Distância</span><b>{estDistance} km</b></div>
-              <div className="mt-1 flex justify-between"><span>Tempo</span><b>{estDuration} min</b></div>
-              <div className="mt-1 flex justify-between text-sm"><span>Valor estimado</span><b>R$ {estFare.toFixed(2)}</b></div>
+            <Field icon="dot-green" value={origin} onChange={setOrigin} readOnly />
+            <Field
+              icon="dot-red"
+              value={destination}
+              onChange={onDestinationChange}
+              placeholder="Para onde?"
+              autoFocus
+            />
+            {routing && (
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="size-3 animate-spin" /> Calculando rota…
+              </p>
+            )}
+            {suggestions.length > 0 && (
+              <ul className="overflow-hidden rounded-xl border border-border bg-background">
+                {suggestions.map((s) => (
+                  <li key={s.placeId}>
+                    <button
+                      onClick={() => pickSuggestion(s)}
+                      className="flex w-full items-start gap-3 px-3 py-2.5 text-left hover:bg-muted"
+                    >
+                      <MapPin className="mt-0.5 size-4 text-secondary" />
+                      <span>
+                        <span className="block text-sm font-semibold">{s.primary}</span>
+                        <span className="block text-[11px] text-muted-foreground">{s.secondary}</span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {stage === "select" && route && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-extrabold">Escolha o veículo</h2>
+              <span className="text-[11px] text-muted-foreground">
+                {route.distance_km.toFixed(1)} km · {route.duration_min} min
+              </span>
             </div>
-            <Button className="h-12 w-full text-sm font-bold" onClick={handleRequest}>
-              Solicitar corrida
+            <VehicleCategoryPicker
+              distanceKm={route.distance_km}
+              durationMin={route.duration_min}
+              selected={category}
+              onSelect={(id, f) => {
+                setCategory(id);
+                setFare(f);
+              }}
+            />
+            <Button
+              className="h-12 w-full text-sm font-bold"
+              disabled={!category}
+              onClick={handleRequest}
+            >
+              {category ? `Solicitar · R$ ${fare.toFixed(2)}` : "Selecione uma categoria"}
+            </Button>
+            <Button variant="ghost" className="h-10 w-full text-xs" onClick={() => setStage("destination")}>
+              Alterar destino
             </Button>
           </div>
         )}
@@ -127,7 +311,9 @@ function PassengerHome() {
               Motorista a caminho · 4 min
             </span>
             <div className="mt-4 flex items-center gap-3">
-              <div className="grid size-14 place-items-center rounded-full bg-secondary text-primary text-lg font-extrabold">JM</div>
+              <div className="grid size-14 place-items-center rounded-full bg-secondary text-primary text-lg font-extrabold">
+                JM
+              </div>
               <div className="flex-1">
                 <p className="text-base font-bold">João Mendes</p>
                 <p className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -143,7 +329,17 @@ function PassengerHome() {
               <Button variant="outline" className="h-11 text-xs">Ligar</Button>
               <Button variant="destructive" className="h-11 text-xs">SOS</Button>
             </div>
-            <Button variant="ghost" className="mt-2 h-10 w-full text-xs" onClick={() => setStage("idle")}>
+            <Button
+              variant="ghost"
+              className="mt-2 h-10 w-full text-xs"
+              onClick={() => {
+                setStage("idle");
+                setDestination("");
+                setDestLL(null);
+                setRoute(null);
+                setCategory(null);
+              }}
+            >
               Cancelar corrida
             </Button>
           </div>
@@ -166,10 +362,19 @@ function Quick({ icon, label, subtitle }: { icon: React.ReactNode; label: string
 }
 
 function Field({
-  icon, value, onChange, placeholder, autoFocus,
+  icon,
+  value,
+  onChange,
+  placeholder,
+  autoFocus,
+  readOnly,
 }: {
-  icon: "dot-green" | "dot-red"; value: string; onChange: (v: string) => void;
-  placeholder?: string; autoFocus?: boolean;
+  icon: "dot-green" | "dot-red";
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  autoFocus?: boolean;
+  readOnly?: boolean;
 }) {
   return (
     <div className="flex items-center gap-3 rounded-xl bg-muted px-3 py-2">
@@ -181,6 +386,7 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         autoFocus={autoFocus}
+        readOnly={readOnly}
       />
     </div>
   );
