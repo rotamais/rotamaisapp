@@ -527,6 +527,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "rides_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "rides_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
@@ -674,6 +681,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "vehicles_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "vehicles_fleet_id_fkey"
             columns: ["fleet_id"]
             isOneToOne: false
@@ -684,7 +698,74 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      drivers_public: {
+        Row: {
+          bio: string | null
+          created_at: string | null
+          fleet_id: string | null
+          id: string | null
+          is_online: boolean | null
+          is_verified: boolean | null
+          license_category: string | null
+          rating: number | null
+          total_trips: number | null
+        }
+        Insert: {
+          bio?: string | null
+          created_at?: string | null
+          fleet_id?: string | null
+          id?: string | null
+          is_online?: boolean | null
+          is_verified?: boolean | null
+          license_category?: string | null
+          rating?: number | null
+          total_trips?: number | null
+        }
+        Update: {
+          bio?: string | null
+          created_at?: string | null
+          fleet_id?: string | null
+          id?: string | null
+          is_online?: boolean | null
+          is_verified?: boolean | null
+          license_category?: string | null
+          rating?: number | null
+          total_trips?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drivers_fleet_id_fkey"
+            columns: ["fleet_id"]
+            isOneToOne: false
+            referencedRelation: "fleets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles_public: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          full_name: string | null
+          id: string | null
+          rating: number | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id?: string | null
+          rating?: number | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id?: string | null
+          rating?: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {
