@@ -2,9 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { RealMap, type LatLng } from "@/components/RealMap";
 import { VehicleCategoryPicker } from "@/components/VehicleCategoryPicker";
+import { SearchingDriver } from "@/components/SearchingDriver";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Briefcase, Home as HomeIcon, Loader2, MapPin, Menu, Search, Star } from "lucide-react";
+import { Briefcase, Home as HomeIcon, Loader2, MapPin, Menu, Search } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { requestRide } from "@/lib/rotamais.functions";
 import { computeRoute, reverseGeocode } from "@/lib/maps.functions";
@@ -15,7 +16,7 @@ export const Route = createFileRoute("/_authenticated/home")({
   component: PassengerHome,
 });
 
-type Stage = "idle" | "destination" | "select" | "searching" | "matched";
+type Stage = "idle" | "destination" | "select" | "searching";
 type Suggestion = { placeId: string; primary: string; secondary: string };
 
 function PassengerHome() {
@@ -30,6 +31,7 @@ function PassengerHome() {
   const [category, setCategory] = useState<VehicleCategory | null>(null);
   const [fare, setFare] = useState<number>(0);
   const [locating, setLocating] = useState(false);
+  const [activeRideId, setActiveRideId] = useState<string | null>(null);
 
   const requestFn = useServerFn(requestRide);
   const reverseFn = useServerFn(reverseGeocode);
@@ -150,7 +152,7 @@ function PassengerHome() {
     if (!originLL || !destLL || !route || !category) return;
     setStage("searching");
     try {
-      await requestFn({
+      const ride = await requestFn({
         data: {
           origin_address: origin,
           origin_lat: originLL.lat,
@@ -165,11 +167,21 @@ function PassengerHome() {
           payment_method: "card",
         },
       });
-      setTimeout(() => setStage("matched"), 2200);
+      setActiveRideId(ride.id);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao solicitar");
       setStage("select");
     }
+  }
+
+  function resetRide() {
+    setActiveRideId(null);
+    setStage("idle");
+    setDestination("");
+    setDestLL(null);
+    setRoute(null);
+    setCategory(null);
+    setSuggestions([]);
   }
 
   return (
@@ -289,60 +301,12 @@ function PassengerHome() {
           </div>
         )}
 
-        {stage === "searching" && (
-          <div className="py-8 text-center">
-            <div className="mx-auto grid size-16 place-items-center">
-              <div className="relative size-6">
-                <span className="rm-pulse absolute inset-0 block size-6 rounded-full" />
-                <span className="relative z-10 block size-6 rounded-full bg-primary" />
-              </div>
-            </div>
-            <p className="mt-4 text-base font-bold">Procurando motoristas próximos…</p>
-            <p className="mt-1 text-xs text-muted-foreground">Buscando o melhor parceiro para você</p>
-            <Button variant="outline" className="mt-6 h-10 px-6 text-sm" onClick={() => setStage("idle")}>
-              Cancelar
-            </Button>
-          </div>
-        )}
-
-        {stage === "matched" && (
-          <div>
-            <span className="inline-flex rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-secondary">
-              Motorista a caminho · 4 min
-            </span>
-            <div className="mt-4 flex items-center gap-3">
-              <div className="grid size-14 place-items-center rounded-full bg-secondary text-primary text-lg font-extrabold">
-                JM
-              </div>
-              <div className="flex-1">
-                <p className="text-base font-bold">João Mendes</p>
-                <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Star className="size-3 fill-primary text-primary" /> 4.92 · Honda Civic Preto
-                </p>
-              </div>
-              <div className="rounded-lg bg-muted px-3 py-1.5 text-xs font-extrabold tracking-widest">
-                ABC-1D23
-              </div>
-            </div>
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              <Button variant="outline" className="h-11 text-xs">Chat</Button>
-              <Button variant="outline" className="h-11 text-xs">Ligar</Button>
-              <Button variant="destructive" className="h-11 text-xs">SOS</Button>
-            </div>
-            <Button
-              variant="ghost"
-              className="mt-2 h-10 w-full text-xs"
-              onClick={() => {
-                setStage("idle");
-                setDestination("");
-                setDestLL(null);
-                setRoute(null);
-                setCategory(null);
-              }}
-            >
-              Cancelar corrida
-            </Button>
-          </div>
+        {stage === "searching" && activeRideId && (
+          <SearchingDriver
+            rideId={activeRideId}
+            onCancelled={resetRide}
+            onCompleted={resetRide}
+          />
         )}
       </div>
     </div>

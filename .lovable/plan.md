@@ -1,55 +1,80 @@
-# Plano: Mapa real + simulação de corrida com categorias
+# Sair do modo simulação
 
-## 1. Conectar Google Maps Platform
-Usar o connector oficial (Maps JavaScript API + Places API New + Routes API + Geocoding via gateway). A chave de browser (`VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY`) é injetada automaticamente — apenas com isso conseguimos: mapa real, autocomplete de endereço, geolocalização reversa e cálculo de rota/distância/tempo.
+Objetivo: ativar fluxos reais de cadastro de passageiro, cadastro/onboarding de motorista, dashboard do motorista e match de corridas — sem dados mock. A simulação de preço (tabela de tarifas baseada em concorrentes −10%) é mantida.
 
-Se preferir, posso usar a conexão gerenciada do Lovable (sem custo de setup para você).
+## 1. Confirmação de e-mail
+- Ativar **auto-confirm** no Lovable Cloud (sem precisar abrir o e-mail).
+- Sign-up já loga o usuário direto.
 
-## 2. Substituir `MapMock` por mapa real
-Novo componente `RealMap.tsx`:
-- carrega o script Maps JS de forma assíncrona com callback;
-- renderiza `google.maps.Map` com tema escuro/minimal alinhado ao visual amarelo/preto;
-- marcadores `google.maps.Marker` para origem, destino e (mock) motoristas próximos;
-- desenha a rota com `DirectionsRenderer` (dados vindos da Routes API).
+## 2. Cadastro de passageiro
+- Já funciona: o trigger `handle_new_user` cria `profiles` + role `passenger`.
+- Adicionar validação suave (telefone obrigatório, mensagem clara) e redirecionar para `/home`.
 
-## 3. Botão "Buscar destino" → geolocalização
-- Ao tocar em "Buscar destino" pedimos `navigator.geolocation.getCurrentPosition`.
-- Centralizamos o mapa nessa coordenada e fazemos reverse geocoding (Geocoding API via gateway, em server function) para preencher o campo "Origem" com o endereço real.
-- Tratamento de permissão negada com toast e fallback para entrada manual.
+## 3. Cadastro / onboarding de motorista
+Hoje o sign-up só insere role `passenger`. Vai mudar para:
 
-## 4. Autocomplete de destino
-- Campo de destino usa Places API (New) — `AutocompleteSuggestion.fetchAutocompleteSuggestions` com session token.
-- Ao escolher uma sugestão buscamos o `place details` (lat/lng + endereço formatado).
+- Quando o usuário escolher "Motorista" no signup, o `account_type='driver'` será lido no trigger:
+  - Mantém role `passenger` (todo motorista também é passageiro).
+  - **Adiciona role `driver`**.
+  - Insere linha em `public.drivers` com `is_verified=false`, `is_suspended=false`, `is_online=false`.
+- Após login, se o usuário tem role `driver` e ainda não foi aprovado, é levado para a tela **Onboarding do motorista** (`/driver`), com 3 passos:
+  1. Dados da CNH (`license_number`, `license_category`, validade).
+  2. Cadastro do veículo (placa, modelo, ano, cor, categoria — usado para casar com `vehicle_category` do pedido).
+  3. Upload de documentos: CNH (frente/verso), CRLV, foto do veículo. Vai para o bucket `documents` (privado) e cria registros em `public.documents` com `verified=false`.
+- Banner persistente "Cadastro em análise" até `drivers.is_verified=true`. Botão "Ficar online" fica desabilitado nesse estado.
+- A aprovação acontece no painel `/admin` (já existe `adminApproveDriver` + `adminVerifyDocument`).
 
-## 5. Cálculo real de distância/tempo
-Server function `estimateRide` que chama a Routes API (`routes:computeRoutes`) pelo gateway e retorna `distance_km`, `duration_min` e a polyline da rota.
+## 4. Dashboard real do motorista (`/driver`)
+Substituir todos os números/cards mockados por dados reais.
 
-## 6. Categorias de veículo e simulação de preço
-Nova etapa "select" antes de "Solicitar corrida", mostrando cards com 4 categorias (referência: tabela média de Uber/99 no Brasil **com 10% de desconto**):
+- **Mapa real**: trocar `MapMock` por `RealMap` (já existe), centrado na geolocalização atual.
+- **Botão "Ficar online / offline"**: chama `updateDriverLocation({ lat, lng, is_online: true })` ao ativar; envia atualizações periódicas (a cada 15s) enquanto online; envia `is_online: false` ao desativar/desmontar. Desabilitado se `is_verified=false`.
+- **Estatísticas reais**: nova server fn `getDriverStats` retornando, para o motorista logado:
+  - Ganhos do dia (`SUM final_fare` em rides `completed` de hoje).
+  - Nº de corridas hoje / semana.
+  - Nota média (`drivers.rating` + count de `reviews`).
+  - Barrinhas da semana = ganhos diários dos últimos 7 dias.
+- **Corridas disponíveis em tempo real**: enquanto online, assinar canal Realtime na tabela `rides` filtrando `status=requested AND driver_id IS NULL`. Inicial via `listAvailableRides`. Cada item mostra origem/destino, distância e fare estimado. Botão "Aceitar" chama `acceptRide({ ride_id })`.
 
-| Categoria | Bandeirada | R$/km | R$/min | Mínimo |
-|---|---|---|---|---|
-| RotaX (econômico)   | R$ 5,40 | R$ 1,53 | R$ 0,27 | R$ 7,20 |
-| RotaConfort         | R$ 6,30 | R$ 1,98 | R$ 0,36 | R$ 9,00 |
-| RotaXL (até 6 pax)  | R$ 7,20 | R$ 2,52 | R$ 0,45 | R$ 11,70 |
-| RotaPet / Moto      | R$ 4,50 | R$ 1,17 | R$ 0,18 | R$ 6,30 |
+## 5. Match passageiro → motorista (fluxo real)
+- `requestRide` (já existente) continua criando `rides.status='requested'`.
+- Após criar, a tela do passageiro entra em estado **"Procurando motorista"** e assina Realtime no próprio `rides.id`. Quando `driver_id` for preenchido e `status='accepted'`, mostra dados do motorista (nome, foto, placa, nota, ETA).
+- Botões: "Cancelar pedido" (chama `updateRideStatus` com `cancelled`).
+- Quando `status` virar `in_progress` e depois `completed`, a UI atualiza e abre a tela de avaliação (`submitReview`).
 
-Fórmula: `fare = max(minimo, bandeirada + km*valor_km + min*valor_min)` + ajuste pela `platform_fee_percent` da tabela `platform_settings`.
+## 6. Habilitar Realtime
+Migration que adiciona `rides` e `drivers` à publicação `supabase_realtime` e configura `REPLICA IDENTITY FULL` para receber payloads completos.
 
-Constantes em `src/lib/pricing.ts` (puro client, sem custo extra de chamada). O usuário vê as 4 opções com tempo/preço calculados ao mesmo tempo, escolhe uma e só então o botão "Solicitar corrida" envia `vehicle_category` + `estimated_fare` para o `requestRide` atual.
+## 7. Admin — pequenos ajustes
+- Garantir que o painel `/admin` mostre claramente os motoristas pendentes (já existe via `adminListDrivers({ status: 'pending' })`) e o link para revisar documentos / aprovar.
+- (Nenhuma mudança de regras de negócio; apenas confirmação visual.)
 
-## 7. Banco de dados
-Adicionar coluna `vehicle_category text` em `rides` (valores: `x | comfort | xl | pet`). Sem mudança de policies.
+## Detalhes técnicos
 
-## 8. Arquivos a alterar/criar
-- `src/components/RealMap.tsx` (novo)
-- `src/components/VehicleCategoryPicker.tsx` (novo)
-- `src/lib/pricing.ts` (novo, fórmula + tabela)
-- `src/lib/maps.functions.ts` (novo: `reverseGeocode`, `computeRoute`)
-- `src/routes/_authenticated/home.tsx` (novo fluxo: idle → destino+autocomplete → escolher categoria → solicitar → buscando → matched)
-- `src/lib/rotamais.functions.ts` (aceitar `vehicle_category`)
-- migração SQL adicionando `vehicle_category` em `rides`
+**Migrations:**
+- Atualizar `handle_new_user` para ler `raw_user_meta_data->>'account_type'` e, se `'driver'`, inserir em `public.user_roles` (role `driver`) e em `public.drivers (id)` com defaults.
+- `ALTER PUBLICATION supabase_realtime ADD TABLE public.rides, public.drivers;`
+- `ALTER TABLE public.rides REPLICA IDENTITY FULL;` (idem `drivers`).
 
-## Pergunta antes de implementar
-1. Posso conectar a integração gerenciada do Google Maps Platform agora? (Sem isso o mapa real não funciona.)
-2. Confirma as 4 categorias acima (RotaX / Confort / XL / Pet-Moto) ou prefere outro conjunto?
+**Auth:**
+- `supabase--configure_auth`: `auto_confirm_email=true`, sem mudar outros flags.
+
+**Novas server fns (`src/lib/driver.functions.ts`):**
+- `getDriverStats()` — agregados do motorista logado.
+- `submitDriverOnboarding({ license_number, license_category, license_expires_at, vehicle: {...} })` — upsert em `drivers` e insert em `vehicles`.
+- `uploadDriverDocument({ type, storage_path })` — registra em `public.documents` (o upload do arquivo em si vai direto do client para o bucket `documents`).
+
+**Arquivos a criar/editar:**
+- `src/routes/_authenticated/driver.tsx` — reescrever: detectar `is_verified`, mostrar onboarding ou dashboard real, integrar `RealMap`, Realtime de rides disponíveis.
+- `src/components/DriverOnboarding.tsx` — wizard 3 passos.
+- `src/components/AvailableRidesList.tsx` — lista em tempo real + aceitar.
+- `src/routes/_authenticated/home.tsx` — após `requestRide`, abrir `SearchingDriver` que assina Realtime do ride criado.
+- `src/components/SearchingDriver.tsx` — estado "procurando" → "motorista a caminho".
+- `src/lib/driver.functions.ts` — novas fns.
+- `supabase/migrations/...sql` — trigger atualizado + Realtime.
+- `src/integrations/supabase/types.ts` — regenerado pela migration.
+
+**Sem mudanças em:**
+- `src/lib/pricing.ts` (simulação de preço fica).
+- `src/lib/maps.functions.ts` / `RealMap.tsx` / `VehicleCategoryPicker.tsx`.
+- RLS / segurança (mantemos as travas já aplicadas).
