@@ -81,7 +81,7 @@ export const updateRideStatus = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data, context }) => {
-    const patch: Record<string, unknown> = { status: data.status };
+    const patch: Record<string, any> = { status: data.status };
     const now = new Date().toISOString();
     if (data.status === "in_progress") patch.started_at = now;
     if (data.status === "completed") {
@@ -130,7 +130,7 @@ export const updateDriverLocation = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data, context }) => {
-    const patch: Record<string, unknown> = { current_lat: data.lat, current_lng: data.lng };
+    const patch: Record<string, any> = { current_lat: data.lat, current_lng: data.lng };
     if (data.is_online !== undefined) patch.is_online = data.is_online;
     const { data: driver, error } = await context.supabase
       .from("drivers")
