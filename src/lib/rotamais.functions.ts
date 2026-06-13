@@ -81,21 +81,18 @@ export const updateRideStatus = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data, context }) => {
-    const patch: Record<string, any> = { status: data.status };
     const now = new Date().toISOString();
-    if (data.status === "in_progress") patch.started_at = now;
-    if (data.status === "completed") {
-      patch.completed_at = now;
-      if (data.final_fare !== undefined) patch.final_fare = data.final_fare;
-    }
-    if (data.status === "cancelled") {
-      patch.cancelled_at = now;
-      patch.cancelled_by = context.userId;
-      patch.cancel_reason = data.cancel_reason;
-    }
     const { data: ride, error } = await context.supabase
       .from("rides")
-      .update(patch)
+      .update({
+        status: data.status,
+        started_at: data.status === "in_progress" ? now : undefined,
+        completed_at: data.status === "completed" ? now : undefined,
+        final_fare: data.status === "completed" ? data.final_fare : undefined,
+        cancelled_at: data.status === "cancelled" ? now : undefined,
+        cancelled_by: data.status === "cancelled" ? context.userId : undefined,
+        cancel_reason: data.status === "cancelled" ? data.cancel_reason : undefined,
+      })
       .eq("id", data.ride_id)
       .select()
       .single();
@@ -130,11 +127,13 @@ export const updateDriverLocation = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data, context }) => {
-    const patch: Record<string, any> = { current_lat: data.lat, current_lng: data.lng };
-    if (data.is_online !== undefined) patch.is_online = data.is_online;
     const { data: driver, error } = await context.supabase
       .from("drivers")
-      .update(patch)
+      .update({
+        current_lat: data.lat,
+        current_lng: data.lng,
+        is_online: data.is_online,
+      })
       .eq("id", context.userId)
       .select()
       .single();
