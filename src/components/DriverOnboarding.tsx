@@ -227,7 +227,7 @@ export function DriverOnboarding({
             </Button>
             <Button
               className="h-11 flex-1 text-sm font-bold"
-              disabled={loading || !brand || !model || !plate}
+              disabled={loading || !brand.trim() || !model.trim() || plate.replace(/[\s-]/g, "").length < 5}
               onClick={handleStep2}
             >
               {loading ? <Loader2 className="size-4 animate-spin" /> : "Continuar"}
