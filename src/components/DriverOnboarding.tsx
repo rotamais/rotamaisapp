@@ -48,28 +48,43 @@ export function DriverOnboarding({
   const [plate, setPlate] = useState("");
 
   async function handleStep2() {
+    const cleanPlate = plate.replace(/[\s-]/g, "").toUpperCase();
+    if (licenseNumber.trim().length < 3) {
+      toast.error("CNH inválida (mínimo 3 caracteres)");
+      setStep(1);
+      return;
+    }
+    if (cleanPlate.length < 5) {
+      toast.error("Placa inválida");
+      return;
+    }
     setLoading(true);
     try {
       const res = await submitFn({
         data: {
-          license_number: licenseNumber,
+          license_number: licenseNumber.trim(),
           license_category: licenseCategory,
           license_expires_at: licenseExpires || undefined,
           vehicle: {
             type,
-            brand,
-            model,
+            brand: brand.trim(),
+            model: model.trim(),
             year: year ? Number(year) : undefined,
             color: color || undefined,
-            plate,
+            plate: cleanPlate,
             seats: type === "motorcycle" ? 2 : 4,
           },
         },
       });
       setVehicleId(res.vehicle_id);
       setStep(3);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao salvar");
+    } catch (e: any) {
+      const msg =
+        e?.message ??
+        e?.error?.message ??
+        (typeof e === "string" ? e : JSON.stringify(e));
+      console.error("[onboarding] submit error", e);
+      toast.error(`Erro ao salvar: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -90,8 +105,13 @@ export function DriverOnboarding({
       });
       setUploaded((u) => ({ ...u, [docType]: true }));
       toast.success("Enviado!");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro no upload");
+    } catch (e: any) {
+      const msg =
+        e?.message ??
+        e?.error?.message ??
+        (typeof e === "string" ? e : JSON.stringify(e));
+      console.error("[onboarding] upload error", e);
+      toast.error(`Erro no upload: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -143,7 +163,7 @@ export function DriverOnboarding({
           </div>
           <Button
             className="h-11 w-full text-sm font-bold"
-            disabled={!licenseNumber || !licenseCategory}
+            disabled={licenseNumber.trim().length < 3 || !licenseCategory}
             onClick={() => setStep(2)}
           >
             Continuar
@@ -207,7 +227,7 @@ export function DriverOnboarding({
             </Button>
             <Button
               className="h-11 flex-1 text-sm font-bold"
-              disabled={loading || !brand || !model || !plate}
+              disabled={loading || !brand.trim() || !model.trim() || plate.replace(/[\s-]/g, "").length < 5}
               onClick={handleStep2}
             >
               {loading ? <Loader2 className="size-4 animate-spin" /> : "Continuar"}

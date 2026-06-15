@@ -1,80 +1,63 @@
-# Sair do modo simulação
+## Problema
 
-Objetivo: ativar fluxos reais de cadastro de passageiro, cadastro/onboarding de motorista, dashboard do motorista e match de corridas — sem dados mock. A simulação de preço (tabela de tarifas baseada em concorrentes −10%) é mantida.
+No passo 2 do onboarding do motorista (Veículo), ao clicar em **Continuar** nada acontece: os dados não são gravados e não avança para o passo 3 (Documentos).
 
-## 1. Confirmação de e-mail
-- Ativar **auto-confirm** no Lovable Cloud (sem precisar abrir o e-mail).
-- Sign-up já loga o usuário direto.
+## Diagnóstico provável
 
-## 2. Cadastro de passageiro
-- Já funciona: o trigger `handle_new_user` cria `profiles` + role `passenger`.
-- Adicionar validação suave (telefone obrigatório, mensagem clara) e redirecionar para `/home`.
+Revisando `src/components/DriverOnboarding.tsx` + `src/lib/driver.functions.ts` + RLS/schema do banco, as causas mais prováveis são:
 
-## 3. Cadastro / onboarding de motorista
-Hoje o sign-up só insere role `passenger`. Vai mudar para:
+1. **Validação Zod silenciosamente falhando no cliente**: o schema exige `license_number.min(3)` e `plate.min(5)`, mas o botão do passo 1/2 só checa "não vazio". Se faltar algo, o `parse` lança e cai no `catch` — o `toast.error` aparece muito rápido / fora da viewport, dando a impressão de que "nada acontece".
+2. **Erro do servidor sem mensagem visível**: o `toast.error` usa apenas `e.message`, e erros do TanStack server-fn às vezes chegam como objeto genérico (sem `instanceof Error`), exibindo "Erro ao salvar" sem detalhe — ou simplesmente sem nenhum toast se o erro for um `Response`.
+3. **Campo `year` opcional enviado como `NaN`** quando o usuário digita e apaga: `Number("")` → `0`, mas `year ? Number(year) : undefined` cobre isso. OK.
+4. **`updated_at` em `drivers` sem trigger** — não bloqueia o update, então descartado.
 
-- Quando o usuário escolher "Motorista" no signup, o `account_type='driver'` será lido no trigger:
-  - Mantém role `passenger` (todo motorista também é passageiro).
-  - **Adiciona role `driver`**.
-  - Insere linha em `public.drivers` com `is_verified=false`, `is_suspended=false`, `is_online=false`.
-- Após login, se o usuário tem role `driver` e ainda não foi aprovado, é levado para a tela **Onboarding do motorista** (`/driver`), com 3 passos:
-  1. Dados da CNH (`license_number`, `license_category`, validade).
-  2. Cadastro do veículo (placa, modelo, ano, cor, categoria — usado para casar com `vehicle_category` do pedido).
-  3. Upload de documentos: CNH (frente/verso), CRLV, foto do veículo. Vai para o bucket `documents` (privado) e cria registros em `public.documents` com `verified=false`.
-- Banner persistente "Cadastro em análise" até `drivers.is_verified=true`. Botão "Ficar online" fica desabilitado nesse estado.
-- A aprovação acontece no painel `/admin` (já existe `adminApproveDriver` + `adminVerifyDocument`).
+RLS, GRANTs e colunas das tabelas `drivers` e `vehicles` estão corretos (verificado via `pg_policies` e `information_schema.columns`). O problema é frontend/handling.
 
-## 4. Dashboard real do motorista (`/driver`)
-Substituir todos os números/cards mockados por dados reais.
+## Plano
 
-- **Mapa real**: trocar `MapMock` por `RealMap` (já existe), centrado na geolocalização atual.
-- **Botão "Ficar online / offline"**: chama `updateDriverLocation({ lat, lng, is_online: true })` ao ativar; envia atualizações periódicas (a cada 15s) enquanto online; envia `is_online: false` ao desativar/desmontar. Desabilitado se `is_verified=false`.
-- **Estatísticas reais**: nova server fn `getDriverStats` retornando, para o motorista logado:
-  - Ganhos do dia (`SUM final_fare` em rides `completed` de hoje).
-  - Nº de corridas hoje / semana.
-  - Nota média (`drivers.rating` + count de `reviews`).
-  - Barrinhas da semana = ganhos diários dos últimos 7 dias.
-- **Corridas disponíveis em tempo real**: enquanto online, assinar canal Realtime na tabela `rides` filtrando `status=requested AND driver_id IS NULL`. Inicial via `listAvailableRides`. Cada item mostra origem/destino, distância e fare estimado. Botão "Aceitar" chama `acceptRide({ ride_id })`.
+### 1. Endurecer e dar feedback na validação (frontend)
 
-## 5. Match passageiro → motorista (fluxo real)
-- `requestRide` (já existente) continua criando `rides.status='requested'`.
-- Após criar, a tela do passageiro entra em estado **"Procurando motorista"** e assina Realtime no próprio `rides.id`. Quando `driver_id` for preenchido e `status='accepted'`, mostra dados do motorista (nome, foto, placa, nota, ETA).
-- Botões: "Cancelar pedido" (chama `updateRideStatus` com `cancelled`).
-- Quando `status` virar `in_progress` e depois `completed`, a UI atualiza e abre a tela de avaliação (`submitReview`).
+Em `src/components/DriverOnboarding.tsx`:
 
-## 6. Habilitar Realtime
-Migration que adiciona `rides` e `drivers` à publicação `supabase_realtime` e configura `REPLICA IDENTITY FULL` para receber payloads completos.
+- Passo 1: bloquear "Continuar" enquanto `licenseNumber.length < 3`; mostrar mensagem inline ("CNH deve ter ao menos 3 caracteres") quando inválido após blur.
+- Passo 2: bloquear "Continuar" enquanto `plate.replace(/\s/g,'').length < 5`; mostrar mensagem inline ("Placa inválida").
+- Normalizar `plate` removendo espaços/hífen antes de enviar.
 
-## 7. Admin — pequenos ajustes
-- Garantir que o painel `/admin` mostre claramente os motoristas pendentes (já existe via `adminListDrivers({ status: 'pending' })`) e o link para revisar documentos / aprovar.
-- (Nenhuma mudança de regras de negócio; apenas confirmação visual.)
+### 2. Tornar erros do servidor sempre visíveis
 
-## Detalhes técnicos
+No `handleStep2` (e também no `handleUpload`):
 
-**Migrations:**
-- Atualizar `handle_new_user` para ler `raw_user_meta_data->>'account_type'` e, se `'driver'`, inserir em `public.user_roles` (role `driver`) e em `public.drivers (id)` com defaults.
-- `ALTER PUBLICATION supabase_realtime ADD TABLE public.rides, public.drivers;`
-- `ALTER TABLE public.rides REPLICA IDENTITY FULL;` (idem `drivers`).
+```ts
+} catch (e: any) {
+  const msg =
+    e?.message ??
+    e?.error?.message ??
+    (typeof e === "string" ? e : JSON.stringify(e));
+  console.error("[onboarding] submit error", e);
+  toast.error(`Erro ao salvar: ${msg}`);
+}
+```
 
-**Auth:**
-- `supabase--configure_auth`: `auto_confirm_email=true`, sem mudar outros flags.
+Assim qualquer falha de rede / Zod / RLS aparece com texto.
 
-**Novas server fns (`src/lib/driver.functions.ts`):**
-- `getDriverStats()` — agregados do motorista logado.
-- `submitDriverOnboarding({ license_number, license_category, license_expires_at, vehicle: {...} })` — upsert em `drivers` e insert em `vehicles`.
-- `uploadDriverDocument({ type, storage_path })` — registra em `public.documents` (o upload do arquivo em si vai direto do client para o bucket `documents`).
+### 3. Server function: mensagens mais úteis
 
-**Arquivos a criar/editar:**
-- `src/routes/_authenticated/driver.tsx` — reescrever: detectar `is_verified`, mostrar onboarding ou dashboard real, integrar `RealMap`, Realtime de rides disponíveis.
-- `src/components/DriverOnboarding.tsx` — wizard 3 passos.
-- `src/components/AvailableRidesList.tsx` — lista em tempo real + aceitar.
-- `src/routes/_authenticated/home.tsx` — após `requestRide`, abrir `SearchingDriver` que assina Realtime do ride criado.
-- `src/components/SearchingDriver.tsx` — estado "procurando" → "motorista a caminho".
-- `src/lib/driver.functions.ts` — novas fns.
-- `supabase/migrations/...sql` — trigger atualizado + Realtime.
-- `src/integrations/supabase/types.ts` — regenerado pela migration.
+Em `src/lib/driver.functions.ts` → `submitDriverOnboarding`:
 
-**Sem mudanças em:**
-- `src/lib/pricing.ts` (simulação de preço fica).
-- `src/lib/maps.functions.ts` / `RealMap.tsx` / `VehicleCategoryPicker.tsx`.
-- RLS / segurança (mantemos as travas já aplicadas).
+- Antes do `update` em `drivers`, garantir que existe a row (motorista pode ter sido criado antes da migration); se `select` retornar `null`, fazer `insert` com `id = userId` e os campos do onboarding em vez de `update`. Isto evita o caso silencioso onde `update().eq("id", userId)` afeta 0 linhas e o handler retorna `ok` sem realmente persistir.
+- Detectar `update` que afetou 0 linhas (usando `.select()` + checagem do array) e lançar erro explícito: "Cadastro de motorista não encontrado".
+- Retornar erro 409 amigável quando a placa já existe para outro motorista (`23505`).
+
+### 4. Verificação rápida pós-fix
+
+Após aplicar:
+1. Abrir o preview, fazer cadastro como motorista, preencher CNH e veículo, clicar Continuar.
+2. Confirmar no log do server fn que `submitDriverOnboarding` retornou `{ ok: true, vehicle_id: ... }`.
+3. Confirmar que o passo 3 (Documentos) aparece e que aparecem registros em `public.drivers` (license_number preenchido) e `public.vehicles` (uma linha com `driver_id = auth.uid()`).
+
+## Arquivos afetados
+
+- `src/components/DriverOnboarding.tsx` — validação + handler de erro.
+- `src/lib/driver.functions.ts` — upsert seguro + mensagens explícitas.
+
+Nenhuma migração nova; nenhuma alteração em RLS, schemas ou políticas.
