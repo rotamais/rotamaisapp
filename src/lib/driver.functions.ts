@@ -23,25 +23,33 @@ export const submitDriverOnboarding = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => onboardingSchema.parse(d))
   .handler(async ({ context, data }) => {
     const sb = context.supabase;
+    const plate = data.vehicle.plate.replace(/[\s-]/g, "").toUpperCase();
 
-    const { error: dErr } = await sb
+    // Upsert driver row (cobre caso de motoristas criados antes do trigger)
+    const driverPayload = {
+      id: context.userId,
+      license_number: data.license_number,
+      license_category: data.license_category,
+      license_expires_at: data.license_expires_at ?? null,
+      bio: data.bio ?? null,
+    };
+    const { data: upserted, error: dErr } = await sb
       .from("drivers")
-      .update({
-        license_number: data.license_number,
-        license_category: data.license_category,
-        license_expires_at: data.license_expires_at ?? null,
-        bio: data.bio ?? null,
-      })
-      .eq("id", context.userId);
-    if (dErr) throw new Error(dErr.message);
+      .upsert(driverPayload, { onConflict: "id" })
+      .select("id");
+    if (dErr) throw new Error(`Não foi possível salvar a CNH: ${dErr.message}`);
+    if (!upserted || upserted.length === 0) {
+      throw new Error("Cadastro de motorista não encontrado para este usuário.");
+    }
 
-    // Insere veículo (ou ignora se placa duplicada do mesmo motorista)
-    const { data: existing } = await sb
+    // Insere veículo (ou reusa o existente do mesmo motorista com a placa)
+    const { data: existing, error: selErr } = await sb
       .from("vehicles")
       .select("id")
       .eq("driver_id", context.userId)
-      .eq("plate", data.vehicle.plate.toUpperCase())
+      .eq("plate", plate)
       .maybeSingle();
+    if (selErr) throw new Error(`Erro ao consultar veículo: ${selErr.message}`);
 
     let vehicleId = existing?.id as string | undefined;
     if (!vehicleId) {
@@ -54,12 +62,17 @@ export const submitDriverOnboarding = createServerFn({ method: "POST" })
           model: data.vehicle.model,
           year: data.vehicle.year ?? null,
           color: data.vehicle.color ?? null,
-          plate: data.vehicle.plate.toUpperCase(),
+          plate,
           seats: data.vehicle.seats,
         })
         .select("id")
         .single();
-      if (vErr) throw new Error(vErr.message);
+      if (vErr) {
+        if ((vErr as any).code === "23505") {
+          throw new Error("Esta placa já está cadastrada para outro motorista.");
+        }
+        throw new Error(`Erro ao salvar veículo: ${vErr.message}`);
+      }
       vehicleId = v.id;
     }
     return { ok: true, vehicle_id: vehicleId };
