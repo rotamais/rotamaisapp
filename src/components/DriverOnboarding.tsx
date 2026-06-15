@@ -163,7 +163,7 @@ export function DriverOnboarding({
           </div>
           <Button
             className="h-11 w-full text-sm font-bold"
-            disabled={!licenseNumber || !licenseCategory}
+            disabled={licenseNumber.trim().length < 3 || !licenseCategory}
             onClick={() => setStep(2)}
           >
             Continuar
