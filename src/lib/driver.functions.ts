@@ -11,7 +11,7 @@ const onboardingSchema = z.object({
     type: z.enum(["car", "motorcycle", "van", "bike", "scooter"]),
     brand: z.string().min(1),
     model: z.string().min(1),
-    year: z.number().int().min(1980).max(new Date().getFullYear() + 1).optional(),
+    year: z.number().int().min(1980).max(2100).optional(),
     color: z.string().optional(),
     plate: z.string().min(5),
     seats: z.number().int().min(1).max(8).default(4),
