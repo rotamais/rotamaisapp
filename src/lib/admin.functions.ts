@@ -192,14 +192,30 @@ export const adminDriverDocuments = createServerFn({ method: "GET" })
   .handler(async ({ context, data }) => {
     await ensureAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: docs, error } = await supabaseAdmin
-      .from("documents")
-      .select("*")
-      .eq("user_id", data.driver_id)
-      .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
-    return docs ?? [];
+    const [docsRes, vehiclesRes, profileRes] = await Promise.all([
+      supabaseAdmin
+        .from("documents")
+        .select("*")
+        .eq("user_id", data.driver_id)
+        .order("created_at", { ascending: false }),
+      supabaseAdmin.from("vehicles").select("*").eq("driver_id", data.driver_id),
+      supabaseAdmin.from("profiles").select("full_name, phone").eq("id", data.driver_id).maybeSingle(),
+    ]);
+    if (docsRes.error) throw new Error(docsRes.error.message);
+    const paths = (docsRes.data ?? []).map((d: any) => d.storage_path).filter(Boolean);
+    let urls: Record<string, string> = {};
+    if (paths.length) {
+      const { data: signed } = await supabaseAdmin.storage
+        .from("documents")
+        .createSignedUrls(paths, 60 * 30);
+      (signed ?? []).forEach((s: any) => {
+        if (s.path && s.signedUrl) urls[s.path] = s.signedUrl;
+      });
+    }
+    const docs = (docsRes.data ?? []).map((d: any) => ({ ...d, url: urls[d.storage_path] ?? null }));
+    return { documents: docs, vehicles: vehiclesRes.data ?? [], profile: profileRes.data ?? null };
   });
+
 
 export const adminVerifyDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
