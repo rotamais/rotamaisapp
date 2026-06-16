@@ -406,19 +406,61 @@ function DriversTab() {
       {openDocsFor && (
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-bold">Documentos do motorista</h3>
+            <h3 className="text-sm font-bold">
+              Documentos {(documents as any)?.profile?.full_name ? `· ${(documents as any).profile.full_name}` : ""}
+            </h3>
             <Button size="sm" variant="ghost" onClick={() => setOpenDocsFor(null)}>
               Fechar
             </Button>
           </div>
-          <div className="space-y-2">
-            {(documents ?? []).map((doc: any) => (
-              <div key={doc.id} className="flex items-center justify-between rounded-lg border border-border p-2.5 text-sm">
-                <div>
-                  <p className="font-semibold">{doc.type}</p>
-                  <p className="text-xs text-muted-foreground">{doc.storage_path}</p>
+
+          {(documents as any)?.vehicles?.length ? (
+            <div className="mb-4 grid gap-2 md:grid-cols-2">
+              {(documents as any).vehicles.map((v: any) => (
+                <div key={v.id} className="rounded-lg border border-border p-3 text-xs">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Veículo</p>
+                  <p className="mt-0.5 font-semibold text-sm">
+                    {v.brand} {v.model} {v.year ? `· ${v.year}` : ""}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {v.type} · {v.color ?? "cor não informada"} · Placa <span className="font-mono">{v.plate}</span> · {v.seats} lug.
+                  </p>
                 </div>
-                <div className="flex gap-1.5">
+              ))}
+            </div>
+          ) : null}
+
+          <div className="grid gap-2 md:grid-cols-2">
+            {((documents as any)?.documents ?? []).map((doc: any) => (
+              <div key={doc.id} className="flex gap-3 rounded-lg border border-border p-2.5 text-sm">
+                {doc.url ? (
+                  /\.(pdf)$/i.test(doc.storage_path) ? (
+                    <a
+                      href={doc.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="grid size-16 shrink-0 place-items-center rounded-md bg-muted text-[10px] font-bold text-muted-foreground"
+                    >
+                      PDF
+                    </a>
+                  ) : (
+                    <a href={doc.url} target="_blank" rel="noreferrer" className="shrink-0">
+                      <img src={doc.url} alt={doc.type} className="size-16 rounded-md object-cover" />
+                    </a>
+                  )
+                ) : (
+                  <div className="grid size-16 shrink-0 place-items-center rounded-md bg-muted text-[10px] text-muted-foreground">
+                    —
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold capitalize">{String(doc.type).replace("_", " ")}</p>
+                  <p className="truncate text-xs text-muted-foreground">{doc.storage_path}</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {doc.verified ? "Verificado" : "Aguardando análise"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-col gap-1.5">
                   {doc.verified ? (
                     <Button size="sm" variant="outline" onClick={() => verifyDoc.mutate({ document_id: doc.id, verified: false })}>
                       Revogar
@@ -431,10 +473,13 @@ function DriversTab() {
                 </div>
               </div>
             ))}
-            {!documents?.length && <p className="text-sm text-muted-foreground">Sem documentos enviados.</p>}
+            {!((documents as any)?.documents ?? []).length && (
+              <p className="text-sm text-muted-foreground">Sem documentos enviados.</p>
+            )}
           </div>
         </div>
       )}
+
     </div>
   );
 }
