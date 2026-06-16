@@ -25,6 +25,15 @@ export const submitDriverOnboarding = createServerFn({ method: "POST" })
     const sb = context.supabase;
     const plate = data.vehicle.plate.replace(/[\s-]/g, "").toUpperCase();
 
+    // Garante o papel 'driver' (necessário pelas políticas RLS de drivers/vehicles).
+    // Usuários que entraram via OAuth sem account_type=driver não recebem esse papel no trigger.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error: roleErr } = await supabaseAdmin
+      .from("user_roles")
+      .upsert({ user_id: context.userId, role: "driver" }, { onConflict: "user_id,role" });
+    if (roleErr) throw new Error(`Não foi possível habilitar perfil de motorista: ${roleErr.message}`);
+
+
     // Upsert driver row (cobre caso de motoristas criados antes do trigger)
     const driverPayload = {
       id: context.userId,
