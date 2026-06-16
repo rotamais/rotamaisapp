@@ -87,18 +87,46 @@ export const submitDriverOnboarding = createServerFn({ method: "POST" })
     return { ok: true, vehicle_id: vehicleId };
   });
 
+const DOC_TYPES = [
+  "cnh",
+  "crlv",
+  "vehicle_photo",
+  "profile_photo",
+  "insurance",
+  "identity",
+  "vehicle_other",
+  "other",
+] as const;
+
 export const registerDriverDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z
       .object({
-        type: z.enum(["cnh", "crlv", "vehicle_photo", "profile_photo", "insurance", "other"]),
+        type: z.enum(DOC_TYPES),
         storage_path: z.string().min(1),
         vehicle_id: z.string().uuid().optional(),
+        replace: z.boolean().optional(),
       })
       .parse(d),
   )
   .handler(async ({ context, data }) => {
+    // Quando substitui, apaga registros anteriores do mesmo tipo (e arquivos no storage).
+    if (data.replace) {
+      const { data: old } = await context.supabase
+        .from("documents")
+        .select("id, storage_path")
+        .eq("user_id", context.userId)
+        .eq("type", data.type);
+      const paths = (old ?? []).map((d) => d.storage_path).filter(Boolean);
+      if (paths.length) {
+        await context.supabase.storage.from("documents").remove(paths);
+        await context.supabase
+          .from("documents")
+          .delete()
+          .in("id", (old ?? []).map((d) => d.id));
+      }
+    }
     const { error } = await context.supabase.from("documents").insert({
       user_id: context.userId,
       type: data.type,
@@ -108,6 +136,55 @@ export const registerDriverDocument = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+export const getDriverDocumentUrls = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ paths: z.array(z.string().min(1)).max(50) }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    if (!data.paths.length) return {} as Record<string, string>;
+    const { data: signed, error } = await context.supabase.storage
+      .from("documents")
+      .createSignedUrls(data.paths, 60 * 30);
+    if (error) throw new Error(error.message);
+    const map: Record<string, string> = {};
+    (signed ?? []).forEach((s: any) => {
+      if (s.path && s.signedUrl) map[s.path] = s.signedUrl;
+    });
+    return map;
+  });
+
+export const updateDriverVehicle = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        vehicle_id: z.string().uuid(),
+        type: z.enum(["car", "motorcycle", "van", "bike", "scooter"]).optional(),
+        brand: z.string().min(1).optional(),
+        model: z.string().min(1).optional(),
+        year: z.number().int().min(1980).max(2100).nullable().optional(),
+        color: z.string().nullable().optional(),
+        plate: z.string().min(5).optional(),
+        seats: z.number().int().min(1).max(8).optional(),
+        is_active: z.boolean().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    const { vehicle_id, plate, ...rest } = data;
+    const payload: any = { ...rest };
+    if (plate) payload.plate = plate.replace(/[\s-]/g, "").toUpperCase();
+    const { error } = await context.supabase
+      .from("vehicles")
+      .update(payload)
+      .eq("id", vehicle_id)
+      .eq("driver_id", context.userId);
+    if (error) throw new Error(`Erro ao atualizar veículo: ${error.message}`);
+    return { ok: true };
+  });
+
 
 export const getDriverState = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
