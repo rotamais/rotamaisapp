@@ -876,6 +876,8 @@ export type Database = {
         | "profile_photo"
         | "insurance"
         | "other"
+        | "identity"
+        | "vehicle_other"
       payment_method: "cash" | "card" | "pix" | "wallet"
       payment_status: "pending" | "authorized" | "paid" | "failed" | "refunded"
       ride_status:
@@ -1023,6 +1025,8 @@ export const Constants = {
         "profile_photo",
         "insurance",
         "other",
+        "identity",
+        "vehicle_other",
       ],
       payment_method: ["cash", "card", "pix", "wallet"],
       payment_status: ["pending", "authorized", "paid", "failed", "refunded"],
