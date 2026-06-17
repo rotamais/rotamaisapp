@@ -38,7 +38,8 @@ import {
   adminSuspendDriver,
   adminUpdatePlatformFee,
   adminUserHistory,
-  adminVerifyDocument,
+  adminApproveDocument,
+  adminRevokeDocument,
 } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -456,17 +457,19 @@ function DriversTab() {
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold capitalize">{String(doc.type).replace("_", " ")}</p>
                   <p className="truncate text-xs text-muted-foreground">{doc.storage_path}</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    {doc.verified ? "Verificado" : "Aguardando análise"}
+                  <p className="mt-0.5 text-[11px] font-bold">
+                    <span className={doc.verified ? "text-emerald-600" : "text-amber-600"}>
+                      {doc.verified ? "Aprovado" : "Em análise"}
+                    </span>
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-col gap-1.5">
                   {doc.verified ? (
-                    <Button size="sm" variant="outline" onClick={() => verifyDoc.mutate({ document_id: doc.id, verified: false })}>
+                    <Button size="sm" variant="outline" disabled={revokeDoc.isPending} onClick={() => revokeDoc.mutate(doc.id)}>
                       Revogar
                     </Button>
                   ) : (
-                    <Button size="sm" onClick={() => verifyDoc.mutate({ document_id: doc.id, verified: true })}>
+                    <Button size="sm" disabled={approveDoc.isPending} onClick={() => approveDoc.mutate(doc.id)}>
                       Aprovar
                     </Button>
                   )}
