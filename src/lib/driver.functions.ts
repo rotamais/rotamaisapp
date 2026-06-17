@@ -244,3 +244,88 @@ export const getDriverStats = createServerFn({ method: "GET" })
       daily,
     };
   });
+
+// Lista corridas disponíveis com perfil do passageiro (foto, nome e nota)
+export const listAvailableRidesForDriver = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: rides, error } = await context.supabase
+      .from("rides")
+      .select(
+        "id, passenger_id, origin_address, destination_address, origin_lat, origin_lng, destination_lat, destination_lng, distance_km, duration_min, estimated_fare, vehicle_category, payment_method, requested_at",
+      )
+      .eq("status", "requested")
+      .is("driver_id", null)
+      .order("requested_at", { ascending: true })
+      .limit(20);
+    if (error) throw new Error(error.message);
+    if (!rides?.length) return [];
+    const ids = Array.from(new Set(rides.map((r: any) => r.passenger_id)));
+    const { data: profiles } = await context.supabase
+      .from("profiles")
+      .select("id, full_name, avatar_url, rating, total_rides")
+      .in("id", ids);
+    const map = new Map((profiles ?? []).map((p: any) => [p.id, p]));
+    return rides.map((r: any) => ({ ...r, passenger: map.get(r.passenger_id) ?? null }));
+  });
+
+// Ganhos detalhados do motorista por período (week | month | year)
+export const getDriverEarnings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ period: z.enum(["week", "month", "year"]).default("week") }).parse(d ?? {}),
+  )
+  .handler(async ({ context, data }) => {
+    const sb = context.supabase;
+    const now = new Date();
+    const start = new Date(now);
+    if (data.period === "week") start.setDate(now.getDate() - 6);
+    else if (data.period === "month") start.setDate(now.getDate() - 29);
+    else start.setMonth(now.getMonth() - 11);
+    start.setHours(0, 0, 0, 0);
+
+    const { data: rides, error } = await sb
+      .from("rides")
+      .select("id, final_fare, distance_km, duration_min, completed_at, origin_address, destination_address")
+      .eq("driver_id", context.userId)
+      .eq("status", "completed")
+      .gte("completed_at", start.toISOString())
+      .order("completed_at", { ascending: false });
+    if (error) throw new Error(error.message);
+
+    const list = rides ?? [];
+    const total = list.reduce((a, r: any) => a + Number(r.final_fare ?? 0), 0);
+    const count = list.length;
+    const avg = count ? total / count : 0;
+    const distance = list.reduce((a, r: any) => a + Number(r.distance_km ?? 0), 0);
+
+    // Buckets para o gráfico
+    let bucketCount = 7;
+    let labels: string[] = [];
+    if (data.period === "week") {
+      bucketCount = 7;
+      labels = ["D", "S", "T", "Q", "Q", "S", "S"];
+    } else if (data.period === "month") {
+      bucketCount = 30;
+      labels = Array.from({ length: 30 }, (_, i) => String(i + 1));
+    } else {
+      bucketCount = 12;
+      labels = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
+    }
+    const buckets = Array(bucketCount).fill(0);
+    list.forEach((r: any) => {
+      if (!r.completed_at) return;
+      const d = new Date(r.completed_at);
+      let idx = 0;
+      if (data.period === "week") {
+        idx = 6 - Math.floor((now.getTime() - d.setHours(0, 0, 0, 0)) / 86400000);
+      } else if (data.period === "month") {
+        idx = 29 - Math.floor((now.getTime() - d.setHours(0, 0, 0, 0)) / 86400000);
+      } else {
+        idx = d.getMonth();
+      }
+      if (idx >= 0 && idx < bucketCount) buckets[idx] += Number(r.final_fare ?? 0);
+    });
+
+    return { total, count, avg, distance, buckets, labels, rides: list };
+  });
