@@ -23,6 +23,7 @@ import { DriverDocumentsManager } from "@/components/DriverDocumentsManager";
 import { DriverVehicleSettings } from "@/components/DriverVehicleSettings";
 import { AvailableRidesList } from "@/components/AvailableRidesList";
 import { useSession } from "@/hooks/useSession";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/driver")({
@@ -98,6 +99,33 @@ function DriverDashboard() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Atualização em tempo real quando o admin aprova/revoga documentos ou status do motorista
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`driver-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "documents", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          qc.invalidateQueries({ queryKey: ["driver-state"] });
+          const next = (payload.new as any)?.verified;
+          const prev = (payload.old as any)?.verified;
+          if (next === true && prev !== true) toast.success("Documento aprovado pelo suporte");
+          if (next === false && prev === true) toast.warning("Documento voltou para análise");
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "drivers", filter: `id=eq.${user.id}` },
+        () => qc.invalidateQueries({ queryKey: ["driver-state"] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, qc]);
 
   async function toggleOnline() {
     if (!isVerified) {

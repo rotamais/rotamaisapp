@@ -217,21 +217,36 @@ export const adminDriverDocuments = createServerFn({ method: "GET" })
   });
 
 
+async function setDocumentVerified(context: { supabase: any; userId: string }, document_id: string, verified: boolean) {
+  await ensureAdmin(context);
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: doc, error } = await supabaseAdmin
+    .from("documents")
+    .update({ verified, verified_at: verified ? new Date().toISOString() : null })
+    .eq("id", document_id)
+    .select("id, user_id, type, verified")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!doc) throw new Error("Documento não encontrado");
+  return { ok: true, document: doc };
+}
+
 export const adminVerifyDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z.object({ document_id: z.string().uuid(), verified: z.boolean() }).parse(d),
   )
-  .handler(async ({ context, data }) => {
-    await ensureAdmin(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
-      .from("documents")
-      .update({ verified: data.verified, verified_at: data.verified ? new Date().toISOString() : null })
-      .eq("id", data.document_id);
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
+  .handler(async ({ context, data }) => setDocumentVerified(context, data.document_id, data.verified));
+
+export const adminApproveDocument = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ document_id: z.string().uuid() }).parse(d))
+  .handler(async ({ context, data }) => setDocumentVerified(context, data.document_id, true));
+
+export const adminRevokeDocument = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ document_id: z.string().uuid() }).parse(d))
+  .handler(async ({ context, data }) => setDocumentVerified(context, data.document_id, false));
 
 // ============ RIDES ============
 

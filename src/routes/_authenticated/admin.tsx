@@ -38,7 +38,8 @@ import {
   adminSuspendDriver,
   adminUpdatePlatformFee,
   adminUserHistory,
-  adminVerifyDocument,
+  adminApproveDocument,
+  adminRevokeDocument,
 } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -278,7 +279,8 @@ function DriversTab() {
   const approveFn = useServerFn(adminApproveDriver);
   const suspendFn = useServerFn(adminSuspendDriver);
   const docsFn = useServerFn(adminDriverDocuments);
-  const verifyDocFn = useServerFn(adminVerifyDocument);
+  const approveDocFn = useServerFn(adminApproveDocument);
+  const revokeDocFn = useServerFn(adminRevokeDocument);
   const qc = useQueryClient();
   const [filter, setFilter] = useState<"all" | "pending" | "verified" | "suspended">("all");
   const [openDocsFor, setOpenDocsFor] = useState<string | null>(null);
@@ -311,11 +313,19 @@ function DriversTab() {
     enabled: !!openDocsFor,
   });
 
-  const verifyDoc = useMutation({
-    mutationFn: (v: { document_id: string; verified: boolean }) => verifyDocFn({ data: v }),
+  const approveDoc = useMutation({
+    mutationFn: (document_id: string) => approveDocFn({ data: { document_id } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-driver-docs"] });
-      toast.success("Documento atualizado");
+      toast.success("Documento aprovado");
+    },
+  });
+
+  const revokeDoc = useMutation({
+    mutationFn: (document_id: string) => revokeDocFn({ data: { document_id } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-driver-docs"] });
+      toast.success("Documento revogado");
     },
   });
 
@@ -456,17 +466,19 @@ function DriversTab() {
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold capitalize">{String(doc.type).replace("_", " ")}</p>
                   <p className="truncate text-xs text-muted-foreground">{doc.storage_path}</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    {doc.verified ? "Verificado" : "Aguardando análise"}
+                  <p className="mt-0.5 text-[11px] font-bold">
+                    <span className={doc.verified ? "text-emerald-600" : "text-amber-600"}>
+                      {doc.verified ? "Aprovado" : "Em análise"}
+                    </span>
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-col gap-1.5">
                   {doc.verified ? (
-                    <Button size="sm" variant="outline" onClick={() => verifyDoc.mutate({ document_id: doc.id, verified: false })}>
+                    <Button size="sm" variant="outline" disabled={revokeDoc.isPending} onClick={() => revokeDoc.mutate(doc.id)}>
                       Revogar
                     </Button>
                   ) : (
-                    <Button size="sm" onClick={() => verifyDoc.mutate({ document_id: doc.id, verified: true })}>
+                    <Button size="sm" disabled={approveDoc.isPending} onClick={() => approveDoc.mutate(doc.id)}>
                       Aprovar
                     </Button>
                   )}
