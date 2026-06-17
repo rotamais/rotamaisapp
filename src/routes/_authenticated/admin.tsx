@@ -279,7 +279,8 @@ function DriversTab() {
   const approveFn = useServerFn(adminApproveDriver);
   const suspendFn = useServerFn(adminSuspendDriver);
   const docsFn = useServerFn(adminDriverDocuments);
-  const verifyDocFn = useServerFn(adminVerifyDocument);
+  const approveDocFn = useServerFn(adminApproveDocument);
+  const revokeDocFn = useServerFn(adminRevokeDocument);
   const qc = useQueryClient();
   const [filter, setFilter] = useState<"all" | "pending" | "verified" | "suspended">("all");
   const [openDocsFor, setOpenDocsFor] = useState<string | null>(null);
@@ -312,11 +313,19 @@ function DriversTab() {
     enabled: !!openDocsFor,
   });
 
-  const verifyDoc = useMutation({
-    mutationFn: (v: { document_id: string; verified: boolean }) => verifyDocFn({ data: v }),
+  const approveDoc = useMutation({
+    mutationFn: (document_id: string) => approveDocFn({ data: { document_id } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-driver-docs"] });
-      toast.success("Documento atualizado");
+      toast.success("Documento aprovado");
+    },
+  });
+
+  const revokeDoc = useMutation({
+    mutationFn: (document_id: string) => revokeDocFn({ data: { document_id } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-driver-docs"] });
+      toast.success("Documento revogado");
     },
   });
 
