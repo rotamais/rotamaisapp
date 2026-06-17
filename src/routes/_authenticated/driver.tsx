@@ -3,25 +3,23 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { RealMap, type LatLng } from "@/components/RealMap";
-import { Button } from "@/components/ui/button";
 import {
   Activity,
-  ChevronRight,
   DollarSign,
   FileCheck,
   Loader2,
-  Power,
   Settings2,
   ShieldCheck,
   Star,
-  TrendingUp,
+  Wallet,
 } from "lucide-react";
 import { getDriverState, getDriverStats } from "@/lib/driver.functions";
 import { updateDriverLocation } from "@/lib/rotamais.functions";
 import { DriverOnboarding } from "@/components/DriverOnboarding";
 import { DriverDocumentsManager } from "@/components/DriverDocumentsManager";
 import { DriverVehicleSettings } from "@/components/DriverVehicleSettings";
-import { AvailableRidesList } from "@/components/AvailableRidesList";
+import { DriverEarnings } from "@/components/DriverEarnings";
+import { IncomingRideCard } from "@/components/IncomingRideCard";
 import { useSession } from "@/hooks/useSession";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -30,7 +28,9 @@ export const Route = createFileRoute("/_authenticated/driver")({
   component: DriverDashboard,
 });
 
-type Tab = "drive" | "documents" | "vehicle";
+type Tab = "drive" | "earnings" | "documents" | "vehicle";
+
+const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 function DriverDashboard() {
   const { user } = useSession();
@@ -44,12 +44,11 @@ function DriverDashboard() {
     queryKey: ["driver-stats"],
     queryFn: () => statsFn(),
     enabled: !!state.data?.driver?.is_verified,
+    refetchInterval: 60_000,
   });
 
   const [tab, setTab] = useState<Tab>("drive");
-  const [online, setOnline] = useState(false);
   const [pos, setPos] = useState<LatLng | null>(null);
-  const [acceptedRideId, setAcceptedRideId] = useState<string | null>(null);
   const watchIdRef = useRef<number | null>(null);
 
   const driver = state.data?.driver;
@@ -61,50 +60,13 @@ function DriverDashboard() {
     !!driver && (driver.license_number?.length ?? 0) > 0 && vehicles.length > 0;
   const pendingDocs = documents.filter((d: any) => !d.verified).length;
   const primaryVehicle = vehicles[0];
+  const ready = isVerified && !isSuspended && hasOnboarded;
 
-  useEffect(() => {
-    if (!online) {
-      if (watchIdRef.current != null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
-      return;
-    }
-    if (!navigator.geolocation) {
-      toast.error("Geolocalização indisponível");
-      return;
-    }
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (p) => {
-        const ll = { lat: p.coords.latitude, lng: p.coords.longitude };
-        setPos(ll);
-        locFn({ data: { lat: ll.lat, lng: ll.lng, is_online: true } }).catch(() => {});
-      },
-      (e) => console.warn(e),
-      { enableHighAccuracy: true, maximumAge: 10000 },
-    );
-    return () => {
-      if (watchIdRef.current != null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
-    };
-  }, [online, locFn]);
-
-  useEffect(() => {
-    return () => {
-      if (online && pos) {
-        locFn({ data: { lat: pos.lat, lng: pos.lng, is_online: false } }).catch(() => {});
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Atualização em tempo real quando o admin aprova/revoga documentos ou status do motorista
+  // Tempo real: documentos/driver alterados pelo admin atualizam o painel
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel(`driver-${user.id}`)
+      .channel(`driver-self-${user.id}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "documents", filter: `user_id=eq.${user.id}` },
@@ -127,37 +89,35 @@ function DriverDashboard() {
     };
   }, [user?.id, qc]);
 
-  async function toggleOnline() {
-    if (!isVerified) {
-      toast.error("Aguarde a aprovação do cadastro");
+  // Driver fica disponível automaticamente quando o painel está aberto e o cadastro está ok.
+  // Nada de botão online/offline — segue o padrão Uber/99: abriu o app, está dirigindo.
+  useEffect(() => {
+    if (!ready) return;
+    if (!navigator.geolocation) {
+      toast.error("Geolocalização indisponível. Não será possível receber corridas.");
       return;
     }
-    if (isSuspended) {
-      toast.error("Sua conta está suspensa. Fale com o suporte.");
-      return;
-    }
-    if (online) {
-      if (pos) {
-        await locFn({ data: { lat: pos.lat, lng: pos.lng, is_online: false } }).catch(() => {});
-      }
-      setOnline(false);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      async (p) => {
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (p) => {
         const ll = { lat: p.coords.latitude, lng: p.coords.longitude };
         setPos(ll);
-        try {
-          await locFn({ data: { lat: ll.lat, lng: ll.lng, is_online: true } });
-          setOnline(true);
-        } catch (e) {
-          toast.error(e instanceof Error ? e.message : "Erro ao ficar online");
-        }
+        locFn({ data: { lat: ll.lat, lng: ll.lng, is_online: true } }).catch(() => {});
       },
-      () => toast.error("Permita o acesso à localização"),
-      { enableHighAccuracy: true, timeout: 10000 },
+      () => toast.error("Permita o acesso à localização para receber corridas"),
+      { enableHighAccuracy: true, maximumAge: 10000 },
     );
-  }
+    return () => {
+      if (watchIdRef.current != null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      // Marca offline ao desmontar
+      locFn({
+        data: { lat: pos?.lat ?? 0, lng: pos?.lng ?? 0, is_online: false },
+      }).catch(() => {});
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
 
   if (state.isLoading) {
     return (
@@ -191,11 +151,23 @@ function DriverDashboard() {
   const refresh = () => qc.invalidateQueries({ queryKey: ["driver-state"] });
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-2xl pb-24">
+      {/* Pop-up de corrida com aviso sonoro */}
+      {ready && tab === "drive" && (
+        <IncomingRideCard
+          enabled={ready}
+          onAccepted={() => {
+            qc.invalidateQueries({ queryKey: ["driver-state"] });
+            toast("Siga até o ponto de embarque");
+          }}
+        />
+      )}
+
       {/* Tabs estilo Uber Driver */}
       <div className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur">
-        <div className="grid grid-cols-3">
+        <div className="grid grid-cols-4">
           <TabBtn active={tab === "drive"} onClick={() => setTab("drive")} label="Dirigir" />
+          <TabBtn active={tab === "earnings"} onClick={() => setTab("earnings")} label="Ganhos" />
           <TabBtn
             active={tab === "documents"}
             onClick={() => setTab("documents")}
@@ -208,16 +180,18 @@ function DriverDashboard() {
 
       {tab === "drive" && (
         <div>
-          <div className="relative h-[40vh] min-h-[300px]">
+          <div className="relative h-[55vh] min-h-[360px]">
             <RealMap className="h-full w-full" center={pos ?? undefined} origin={pos ?? undefined} />
             <header className="absolute inset-x-0 top-0 flex items-center justify-between p-4 pt-[env(safe-area-inset-top)]">
               <span className="rounded-full bg-background px-3 py-1.5 text-xs font-semibold shadow-[var(--shadow-soft)]">
-                Motorista
+                {primaryVehicle ? `${primaryVehicle.brand} ${primaryVehicle.model}` : "Motorista"}
               </span>
               <span
-                className={`rounded-full px-3 py-1.5 text-xs font-bold shadow-[var(--shadow-soft)] ${online ? "bg-emerald-500 text-white" : "bg-background text-muted-foreground"}`}
+                className={`rounded-full px-3 py-1.5 text-xs font-bold shadow-[var(--shadow-soft)] ${
+                  ready ? "bg-emerald-500 text-white" : "bg-background text-muted-foreground"
+                }`}
               >
-                {online ? "Online" : "Offline"}
+                {ready ? "Aguardando corridas" : isVerified ? "Inativo" : "Em análise"}
               </span>
             </header>
           </div>
@@ -226,18 +200,12 @@ function DriverDashboard() {
             <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-muted" />
 
             {!isVerified && (
-              <button
-                onClick={() => setTab("documents")}
-                className="mb-4 flex w-full items-center justify-between rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-left text-xs"
-              >
-                <div>
-                  <p className="font-bold text-amber-700 dark:text-amber-300">Cadastro em análise</p>
-                  <p className="mt-1 text-muted-foreground">
-                    Acompanhe seus documentos e envie pendências.
-                  </p>
-                </div>
-                <ChevronRight className="size-4 text-muted-foreground" />
-              </button>
+              <div className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+                <p className="font-bold text-amber-700 dark:text-amber-300">Cadastro em análise</p>
+                <p className="mt-1 text-muted-foreground">
+                  Você começa a receber corridas assim que o suporte aprovar seus documentos.
+                </p>
+              </div>
             )}
 
             {isSuspended && (
@@ -249,20 +217,22 @@ function DriverDashboard() {
               </div>
             )}
 
-            <Button
-              onClick={toggleOnline}
-              disabled={!isVerified || isSuspended}
-              className={`h-14 w-full text-base font-extrabold ${online ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}`}
-            >
-              <Power className="size-5" />
-              {online ? "Ficar offline" : "Ficar online e receber corridas"}
-            </Button>
+            <div className="rounded-2xl bg-primary/5 p-4 text-sm">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-primary">
+                {ready ? "Pronto para corridas" : "Quase lá"}
+              </p>
+              <p className="mt-1 font-bold">
+                {ready
+                  ? "Vamos te avisar com um som assim que uma corrida aparecer."
+                  : "Finalize o cadastro e aprovação para ativar as corridas."}
+              </p>
+            </div>
 
             <div className="mt-5 grid grid-cols-3 gap-3">
               <Stat
                 icon={<DollarSign className="size-4" />}
                 label="Hoje"
-                value={`R$ ${(stats.data?.earnings_today ?? 0).toFixed(0)}`}
+                value={BRL.format(stats.data?.earnings_today ?? 0)}
               />
               <Stat
                 icon={<Activity className="size-4" />}
@@ -276,32 +246,13 @@ function DriverDashboard() {
               />
             </div>
 
-            <div className="mt-5 rounded-2xl border border-border p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold">Resumo da semana</h3>
-                <TrendingUp className="size-4 text-emerald-500" />
-              </div>
-              <p className="mt-1 text-2xl font-extrabold">
-                R$ {(stats.data?.earnings_week ?? 0).toFixed(2)}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {stats.data?.rides_week ?? 0} corridas
-              </p>
-              <div className="mt-3 flex h-12 items-end gap-1.5">
-                {(stats.data?.daily ?? Array(7).fill(0)).map((v, i) => {
-                  const max = Math.max(1, ...(stats.data?.daily ?? [1]));
-                  return (
-                    <div
-                      key={i}
-                      className="flex-1 rounded-t bg-primary"
-                      style={{ height: `${Math.max(4, (v / max) * 100)}%`, opacity: v ? 1 : 0.2 }}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="mt-5 grid grid-cols-3 gap-3">
+              <ShortcutCard
+                icon={<Wallet className="size-5" />}
+                title="Ganhos"
+                desc="Semana, mês e ano"
+                onClick={() => setTab("earnings")}
+              />
               <ShortcutCard
                 icon={<FileCheck className="size-5" />}
                 title="Documentos"
@@ -311,23 +262,17 @@ function DriverDashboard() {
               <ShortcutCard
                 icon={<Settings2 className="size-5" />}
                 title="Veículo"
-                desc={primaryVehicle ? `${primaryVehicle.brand} ${primaryVehicle.model}` : "Configurar"}
+                desc={primaryVehicle ? primaryVehicle.plate : "Configurar"}
                 onClick={() => setTab("vehicle")}
               />
             </div>
-
-            {online && (
-              <div className="mt-5">
-                <h3 className="mb-2 text-sm font-bold">Pedidos disponíveis</h3>
-                <AvailableRidesList onAccepted={(id) => setAcceptedRideId(id)} />
-                {acceptedRideId && (
-                  <p className="mt-2 text-[11px] text-muted-foreground">
-                    Corrida aceita. Confira detalhes no histórico.
-                  </p>
-                )}
-              </div>
-            )}
           </div>
+        </div>
+      )}
+
+      {tab === "earnings" && (
+        <div className="p-4 pt-5">
+          <DriverEarnings />
         </div>
       )}
 
@@ -425,16 +370,13 @@ function ShortcutCard({
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left transition-colors hover:bg-muted/40"
+      className="rounded-2xl border border-border bg-card p-3 text-left transition-colors hover:bg-muted"
     >
-      <div className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
+      <span className="grid size-9 place-items-center rounded-lg bg-secondary text-primary">
         {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold">{title}</p>
-        <p className="truncate text-[11px] text-muted-foreground">{desc}</p>
-      </div>
-      <ChevronRight className="size-4 text-muted-foreground" />
+      </span>
+      <p className="mt-2 text-sm font-bold">{title}</p>
+      <p className="text-[11px] text-muted-foreground">{desc}</p>
     </button>
   );
 }
