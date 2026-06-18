@@ -55,7 +55,11 @@ function Profile() {
       </div>
 
       <div className="mt-6 space-y-2">
-        {data?.roles?.includes("driver") && <Row icon={<Car className="size-4" />} label="Painel do motorista" to="/driver" />}
+        {data?.roles?.includes("driver") ? (
+          <Row icon={<Car className="size-4" />} label="Painel do motorista" to="/driver" />
+        ) : (
+          <Row icon={<Car className="size-4" />} label="Tornar-se motorista" to="/driver" />
+        )}
         <Row icon={<Settings className="size-4" />} label="Editar perfil" />
         <Row icon={<Bell className="size-4" />} label="Notificações" />
         <Row icon={<Shield className="size-4" />} label="Segurança e LGPD" />
