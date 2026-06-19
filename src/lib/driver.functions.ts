@@ -309,6 +309,8 @@ export const triggerDriverSOS = createServerFn({ method: "POST" })
   });
 
 
+
+// Ganhos detalhados do motorista por período (week | month | year)
 export const getDriverEarnings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
