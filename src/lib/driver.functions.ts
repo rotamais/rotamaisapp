@@ -269,7 +269,46 @@ export const listAvailableRidesForDriver = createServerFn({ method: "GET" })
     return rides.map((r: any) => ({ ...r, passenger: map.get(r.passenger_id) ?? null }));
   });
 
-// Ganhos detalhados do motorista por período (week | month | year)
+// Corrida ativa do motorista (estado != requested/completed/cancelled)
+export const getDriverCurrentRide = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: ride, error } = await context.supabase
+      .from("rides")
+      .select(
+        "id, passenger_id, status, origin_address, destination_address, origin_lat, origin_lng, destination_lat, destination_lng, distance_km, duration_min, estimated_fare, final_fare, vehicle_category, payment_method, accepted_at, started_at",
+      )
+      .eq("driver_id", context.userId)
+      .in("status", ["accepted", "driver_arrived", "in_progress"])
+      .order("accepted_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!ride) return null;
+    const { data: passenger } = await context.supabase
+      .from("profiles")
+      .select("id, full_name, avatar_url, rating, total_rides, phone")
+      .eq("id", ride.passenger_id)
+      .maybeSingle();
+    return { ...ride, passenger };
+  });
+
+// SOS — registra evento mínimo via update da localização do motorista. Mantém
+// a interface simples e usa apenas tabelas existentes.
+export const triggerDriverSOS = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ lat: z.number(), lng: z.number(), ride_id: z.string().uuid().optional() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await context.supabase
+      .from("drivers")
+      .update({ current_lat: data.lat, current_lng: data.lng })
+      .eq("id", context.userId);
+    return { ok: true, at: new Date().toISOString() };
+  });
+
+
 export const getDriverEarnings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
