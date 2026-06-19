@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { DriverMenu } from "@/components/DriverMenu";
 import { toast } from "sonner";
 
 /* ===========================================================
@@ -198,9 +199,12 @@ function StatusBar({
         <Power className="size-3.5" />
         {isOffline ? "Você está offline" : "Online"}
       </button>
-      <div className="flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-2 text-[11px] font-bold text-zinc-900 shadow-lg backdrop-blur">
-        <Star className="size-3.5 fill-amber-400 text-amber-400" />
-        {MOCK_PERF.rating.toFixed(2)}
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-2 text-[11px] font-bold text-zinc-900 shadow-lg backdrop-blur">
+          <Star className="size-3.5 fill-amber-400 text-amber-400" />
+          {MOCK_PERF.rating.toFixed(2)}
+        </div>
+        <DriverMenu />
       </div>
     </header>
   );

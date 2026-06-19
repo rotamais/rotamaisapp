@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 
@@ -9,10 +9,16 @@ export const Route = createFileRoute("/_authenticated")({
     if (error || !data.user) throw redirect({ to: "/auth" });
     return { user: data.user };
   },
-  component: () => (
-    <div className="min-h-screen bg-background pb-20">
-      <Outlet />
-      <BottomNav />
-    </div>
-  ),
+  component: AuthedLayout,
 });
+
+function AuthedLayout() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isDriver = pathname.startsWith("/driver");
+  return (
+    <div className={`min-h-screen bg-background ${isDriver ? "" : "pb-20"}`}>
+      <Outlet />
+      {!isDriver && <BottomNav />}
+    </div>
+  );
+}
