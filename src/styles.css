@@ -169,3 +169,12 @@
   background: var(--primary); animation: rm-pulse-ring 2s ease-out infinite;
 }
 .rm-pulse::after { animation-delay: 1s; }
+
+@keyframes route-flow {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+.animate-route-dash {
+  animation: route-flow 1.2s linear infinite;
+}
