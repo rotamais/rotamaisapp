@@ -22,9 +22,6 @@ function Landing() {
             <span className="text-lg font-extrabold tracking-tight">RotaMais</span>
           </div>
           <nav className="flex items-center gap-2">
-            <Link to="/auth" className="hidden rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground sm:inline-flex">
-              Rota
-            </Link>
             <Link
               to="/auth"
               search={{ mode: "signup" }}
@@ -53,14 +50,14 @@ function Landing() {
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
                 to="/auth"
-                search={{ mode: "signup", role: "passenger" }}
+                search={{ mode: "signin", role: "passenger" }}
                 className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-sm transition hover:brightness-105"
               >
                 Sou passageiro
               </Link>
               <Link
                 to="/auth"
-                search={{ mode: "signup", role: "driver" }}
+                search={{ mode: "signin", role: "driver" }}
                 className="inline-flex items-center gap-2 rounded-xl bg-secondary px-5 py-3 text-sm font-bold text-secondary-foreground hover:opacity-90"
               >
                 Quero dirigir
