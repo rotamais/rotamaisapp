@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { DriverDocumentsManager } from "@/components/DriverDocumentsManager";
 import { DriverVehicleSettings } from "@/components/DriverVehicleSettings";
 import { DriverEarnings } from "@/components/DriverEarnings";
-import { Loader2, LogOut, Menu } from "lucide-react";
+import { Loader2, LogOut, Menu, User } from "lucide-react";
 
 export function DriverMenu() {
   const [open, setOpen] = useState(false);
@@ -85,6 +85,17 @@ export function DriverMenu() {
               )}
             </TabsContent>
           </Tabs>
+
+          <Button
+            variant="default"
+            className="mt-4 h-11 w-full text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
+            onClick={() => {
+              setOpen(false);
+              navigate({ to: "/home" });
+            }}
+          >
+            <User className="size-4" /> Modo Passageiro
+          </Button>
 
           <Button
             variant="outline"

@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { getMe } from "@/lib/rotamais.functions";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { Bell, ChevronRight, LogOut, Settings, Shield, Star } from "lucide-react";
+import { Bell, Car, ChevronRight, LogOut, Settings, Shield, Star } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   component: Profile,
@@ -62,6 +62,11 @@ function Profile() {
         <Row icon={<Settings className="size-4" />} label="Editar perfil" />
         <Row icon={<Bell className="size-4" />} label="Notificações" />
         <Row icon={<Shield className="size-4" />} label="Segurança e LGPD" />
+        {data?.roles?.includes("driver") ? (
+          <Row icon={<Car className="size-4" />} label="Modo Motorista" to="/driver" />
+        ) : (
+          <Row icon={<Car className="size-4" />} label="Seja um motorista" to="/driver" />
+        )}
         {data?.roles?.includes("admin") && (
           <Row icon={<Shield className="size-4" />} label="Painel administrativo" to="/admin" />
         )}
