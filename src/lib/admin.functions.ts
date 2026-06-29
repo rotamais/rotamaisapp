@@ -35,7 +35,10 @@ export const adminDashboard = createServerFn({ method: "GET" })
       onlineDrivers,
     ] = await Promise.all([
       supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }),
-      supabaseAdmin.from("drivers").select("id", { count: "exact", head: true }).eq("is_online", true),
+      supabaseAdmin
+        .from("drivers")
+        .select("id", { count: "exact", head: true })
+        .eq("is_online", true),
       supabaseAdmin
         .from("rides")
         .select("id", { count: "exact", head: true })
@@ -45,9 +48,21 @@ export const adminDashboard = createServerFn({ method: "GET" })
         .select("id", { count: "exact", head: true })
         .eq("status", "completed")
         .gte("completed_at", today.toISOString()),
-      supabaseAdmin.from("transactions").select("amount").eq("status", "paid").gte("created_at", today.toISOString()),
-      supabaseAdmin.from("transactions").select("amount").eq("status", "paid").gte("created_at", weekAgo.toISOString()),
-      supabaseAdmin.from("transactions").select("amount").eq("status", "paid").gte("created_at", monthAgo.toISOString()),
+      supabaseAdmin
+        .from("transactions")
+        .select("amount")
+        .eq("status", "paid")
+        .gte("created_at", today.toISOString()),
+      supabaseAdmin
+        .from("transactions")
+        .select("amount")
+        .eq("status", "paid")
+        .gte("created_at", weekAgo.toISOString()),
+      supabaseAdmin
+        .from("transactions")
+        .select("amount")
+        .eq("status", "paid")
+        .gte("created_at", monthAgo.toISOString()),
       supabaseAdmin
         .from("drivers")
         .select("id, current_lat, current_lng, rating")
@@ -76,7 +91,9 @@ export const adminDashboard = createServerFn({ method: "GET" })
 export const adminListUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
-    z.object({ search: z.string().optional(), limit: z.number().int().max(200).default(100) }).parse(d ?? {}),
+    z
+      .object({ search: z.string().optional(), limit: z.number().int().max(200).default(100) })
+      .parse(d ?? {}),
   )
   .handler(async ({ context, data }) => {
     await ensureAdmin(context);
@@ -94,7 +111,9 @@ export const adminListUsers = createServerFn({ method: "GET" })
 
 export const adminSetUserBlocked = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ user_id: z.string().uuid(), blocked: z.boolean() }).parse(d))
+  .inputValidator((d: unknown) =>
+    z.object({ user_id: z.string().uuid(), blocked: z.boolean() }).parse(d),
+  )
   .handler(async ({ context, data }) => {
     await ensureAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -114,7 +133,9 @@ export const adminUserHistory = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rides, error } = await supabaseAdmin
       .from("rides")
-      .select("id, status, origin_address, destination_address, final_fare, estimated_fare, completed_at, created_at")
+      .select(
+        "id, status, origin_address, destination_address, final_fare, estimated_fare, completed_at, created_at",
+      )
       .or(`passenger_id.eq.${data.user_id},driver_id.eq.${data.user_id}`)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -136,7 +157,9 @@ export const adminListDrivers = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     let q = supabaseAdmin
       .from("drivers")
-      .select("id, license_number, license_category, is_verified, is_online, is_suspended, suspended_reason, rating, total_trips, created_at")
+      .select(
+        "id, license_number, license_category, is_verified, is_online, is_suspended, suspended_reason, rating, total_trips, created_at",
+      )
       .order("created_at", { ascending: false })
       .limit(200);
     if (data.status === "pending") q = q.eq("is_verified", false).eq("is_suspended", false);
@@ -173,14 +196,24 @@ export const adminApproveDriver = createServerFn({ method: "POST" })
 export const adminSuspendDriver = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
-    z.object({ driver_id: z.string().uuid(), suspended: z.boolean(), reason: z.string().optional() }).parse(d),
+    z
+      .object({
+        driver_id: z.string().uuid(),
+        suspended: z.boolean(),
+        reason: z.string().optional(),
+      })
+      .parse(d),
   )
   .handler(async ({ context, data }) => {
     await ensureAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("drivers")
-      .update({ is_suspended: data.suspended, suspended_reason: data.reason ?? null, is_online: false })
+      .update({
+        is_suspended: data.suspended,
+        suspended_reason: data.reason ?? null,
+        is_online: false,
+      })
       .eq("id", data.driver_id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -199,11 +232,15 @@ export const adminDriverDocuments = createServerFn({ method: "GET" })
         .eq("user_id", data.driver_id)
         .order("created_at", { ascending: false }),
       supabaseAdmin.from("vehicles").select("*").eq("driver_id", data.driver_id),
-      supabaseAdmin.from("profiles").select("full_name, phone").eq("id", data.driver_id).maybeSingle(),
+      supabaseAdmin
+        .from("profiles")
+        .select("full_name, phone")
+        .eq("id", data.driver_id)
+        .maybeSingle(),
     ]);
     if (docsRes.error) throw new Error(docsRes.error.message);
     const paths = (docsRes.data ?? []).map((d: any) => d.storage_path).filter(Boolean);
-    let urls: Record<string, string> = {};
+    const urls: Record<string, string> = {};
     if (paths.length) {
       const { data: signed } = await supabaseAdmin.storage
         .from("documents")
@@ -212,12 +249,18 @@ export const adminDriverDocuments = createServerFn({ method: "GET" })
         if (s.path && s.signedUrl) urls[s.path] = s.signedUrl;
       });
     }
-    const docs = (docsRes.data ?? []).map((d: any) => ({ ...d, url: urls[d.storage_path] ?? null }));
+    const docs = (docsRes.data ?? []).map((d: any) => ({
+      ...d,
+      url: urls[d.storage_path] ?? null,
+    }));
     return { documents: docs, vehicles: vehiclesRes.data ?? [], profile: profileRes.data ?? null };
   });
 
-
-async function setDocumentVerified(context: { supabase: any; userId: string }, document_id: string, verified: boolean) {
+async function setDocumentVerified(
+  context: { supabase: any; userId: string },
+  document_id: string,
+  verified: boolean,
+) {
   await ensureAdmin(context);
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: doc, error } = await supabaseAdmin
@@ -236,7 +279,9 @@ export const adminVerifyDocument = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z.object({ document_id: z.string().uuid(), verified: z.boolean() }).parse(d),
   )
-  .handler(async ({ context, data }) => setDocumentVerified(context, data.document_id, data.verified));
+  .handler(async ({ context, data }) =>
+    setDocumentVerified(context, data.document_id, data.verified),
+  );
 
 export const adminApproveDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -270,7 +315,8 @@ export const adminListRides = createServerFn({ method: "GET" })
       )
       .order("requested_at", { ascending: false })
       .limit(data.limit);
-    if (data.status === "live") q = q.in("status", ["requested", "accepted", "driver_arrived", "in_progress"]);
+    if (data.status === "live")
+      q = q.in("status", ["requested", "accepted", "driver_arrived", "in_progress"]);
     if (data.status === "completed") q = q.eq("status", "completed");
     if (data.status === "cancelled") q = q.eq("status", "cancelled");
     const { data: rides, error } = await q;
@@ -317,7 +363,11 @@ export const adminUpdatePlatformFee = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await ensureAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: existing } = await supabaseAdmin.from("platform_settings").select("id").limit(1).maybeSingle();
+    const { data: existing } = await supabaseAdmin
+      .from("platform_settings")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
     if (existing) {
       const { error } = await supabaseAdmin
         .from("platform_settings")

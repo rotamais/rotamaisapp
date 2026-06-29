@@ -31,8 +31,8 @@ export const submitDriverOnboarding = createServerFn({ method: "POST" })
     const { error: roleErr } = await supabaseAdmin
       .from("user_roles")
       .upsert({ user_id: context.userId, role: "driver" }, { onConflict: "user_id,role" });
-    if (roleErr) throw new Error(`Não foi possível habilitar perfil de motorista: ${roleErr.message}`);
-
+    if (roleErr)
+      throw new Error(`Não foi possível habilitar perfil de motorista: ${roleErr.message}`);
 
     // Upsert driver row (cobre caso de motoristas criados antes do trigger)
     const driverPayload = {
@@ -124,7 +124,10 @@ export const registerDriverDocument = createServerFn({ method: "POST" })
         await context.supabase
           .from("documents")
           .delete()
-          .in("id", (old ?? []).map((d) => d.id));
+          .in(
+            "id",
+            (old ?? []).map((d) => d.id),
+          );
       }
     }
     const { error } = await context.supabase.from("documents").insert({
@@ -139,9 +142,7 @@ export const registerDriverDocument = createServerFn({ method: "POST" })
 
 export const getDriverDocumentUrls = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
-    z.object({ paths: z.array(z.string().min(1)).max(50) }).parse(d),
-  )
+  .inputValidator((d: unknown) => z.object({ paths: z.array(z.string().min(1)).max(50) }).parse(d))
   .handler(async ({ context, data }) => {
     if (!data.paths.length) return {} as Record<string, string>;
     const { data: signed, error } = await context.supabase.storage
@@ -184,7 +185,6 @@ export const updateDriverVehicle = createServerFn({ method: "POST" })
     if (error) throw new Error(`Erro ao atualizar veículo: ${error.message}`);
     return { ok: true };
   });
-
 
 export const getDriverState = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -308,8 +308,6 @@ export const triggerDriverSOS = createServerFn({ method: "POST" })
     return { ok: true, at: new Date().toISOString() };
   });
 
-
-
 // Ganhos detalhados do motorista por período (week | month | year)
 export const getDriverEarnings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -327,7 +325,9 @@ export const getDriverEarnings = createServerFn({ method: "POST" })
 
     const { data: rides, error } = await sb
       .from("rides")
-      .select("id, final_fare, distance_km, duration_min, completed_at, origin_address, destination_address")
+      .select(
+        "id, final_fare, distance_km, duration_min, completed_at, origin_address, destination_address",
+      )
       .eq("driver_id", context.userId)
       .eq("status", "completed")
       .gte("completed_at", start.toISOString())

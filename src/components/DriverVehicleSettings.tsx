@@ -144,7 +144,13 @@ export function DriverVehicleSettings({
       </label>
 
       <Button onClick={save} disabled={loading} className="h-11 w-full text-sm font-bold">
-        {loading ? <Loader2 className="size-4 animate-spin" /> : <><Save className="size-4" /> Salvar alterações</>}
+        {loading ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <>
+            <Save className="size-4" /> Salvar alterações
+          </>
+        )}
       </Button>
     </div>
   );

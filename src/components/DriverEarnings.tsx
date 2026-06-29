@@ -64,7 +64,10 @@ export function DriverEarnings() {
           </div>
           <div className="mt-1 flex gap-1">
             {(data?.labels ?? []).map((l: string, i: number) => (
-              <span key={i} className="flex-1 text-center text-[9px] font-medium text-muted-foreground">
+              <span
+                key={i}
+                className="flex-1 text-center text-[9px] font-medium text-muted-foreground"
+              >
                 {l}
               </span>
             ))}
@@ -106,7 +109,9 @@ export function DriverEarnings() {
                       {r.distance_km ? ` · ${Number(r.distance_km).toFixed(1)} km` : ""}
                     </p>
                   </div>
-                  <p className="text-base font-extrabold">{BRL.format(Number(r.final_fare ?? 0))}</p>
+                  <p className="text-base font-extrabold">
+                    {BRL.format(Number(r.final_fare ?? 0))}
+                  </p>
                 </div>
               </li>
             ))}

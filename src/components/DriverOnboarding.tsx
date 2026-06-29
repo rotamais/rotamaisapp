@@ -80,9 +80,7 @@ export function DriverOnboarding({
       setStep(3);
     } catch (e: any) {
       const msg =
-        e?.message ??
-        e?.error?.message ??
-        (typeof e === "string" ? e : JSON.stringify(e));
+        e?.message ?? e?.error?.message ?? (typeof e === "string" ? e : JSON.stringify(e));
       console.error("[onboarding] submit error", e);
       toast.error(`Erro ao salvar: ${msg}`);
     } finally {
@@ -107,9 +105,7 @@ export function DriverOnboarding({
       toast.success("Enviado!");
     } catch (e: any) {
       const msg =
-        e?.message ??
-        e?.error?.message ??
-        (typeof e === "string" ? e : JSON.stringify(e));
+        e?.message ?? e?.error?.message ?? (typeof e === "string" ? e : JSON.stringify(e));
       console.error("[onboarding] upload error", e);
       toast.error(`Erro no upload: ${msg}`);
     } finally {
@@ -135,7 +131,11 @@ export function DriverOnboarding({
           <h2 className="text-lg font-extrabold">Dados da CNH</h2>
           <div>
             <Label htmlFor="cnh">Número da CNH</Label>
-            <Input id="cnh" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} />
+            <Input
+              id="cnh"
+              value={licenseNumber}
+              onChange={(e) => setLicenseNumber(e.target.value)}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -227,7 +227,9 @@ export function DriverOnboarding({
             </Button>
             <Button
               className="h-11 flex-1 text-sm font-bold"
-              disabled={loading || !brand.trim() || !model.trim() || plate.replace(/[\s-]/g, "").length < 5}
+              disabled={
+                loading || !brand.trim() || !model.trim() || plate.replace(/[\s-]/g, "").length < 5
+              }
               onClick={handleStep2}
             >
               {loading ? <Loader2 className="size-4 animate-spin" /> : "Continuar"}

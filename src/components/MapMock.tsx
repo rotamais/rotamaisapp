@@ -29,10 +29,26 @@ export function MapMock({
     <div className={`rm-map rm-grid relative overflow-hidden ${className}`}>
       {/* Fake roads */}
       <svg className="absolute inset-0 size-full" viewBox="0 0 400 600" preserveAspectRatio="none">
-        <path d="M0,120 C150,80 250,200 400,150" stroke="oklch(0 0 0 / 0.10)" strokeWidth="14" fill="none" />
-        <path d="M0,320 C120,360 280,260 400,340" stroke="oklch(0 0 0 / 0.10)" strokeWidth="14" fill="none" />
+        <path
+          d="M0,120 C150,80 250,200 400,150"
+          stroke="oklch(0 0 0 / 0.10)"
+          strokeWidth="14"
+          fill="none"
+        />
+        <path
+          d="M0,320 C120,360 280,260 400,340"
+          stroke="oklch(0 0 0 / 0.10)"
+          strokeWidth="14"
+          fill="none"
+        />
         <path d="M180,0 L220,600" stroke="oklch(0 0 0 / 0.10)" strokeWidth="14" fill="none" />
-        <path d="M0,120 C150,80 250,200 400,150" stroke="oklch(1 0 0 / 0.6)" strokeWidth="2" strokeDasharray="6 8" fill="none" />
+        <path
+          d="M0,120 C150,80 250,200 400,150"
+          stroke="oklch(1 0 0 / 0.6)"
+          strokeWidth="2"
+          strokeDasharray="6 8"
+          fill="none"
+        />
       </svg>
 
       {showDrivers &&

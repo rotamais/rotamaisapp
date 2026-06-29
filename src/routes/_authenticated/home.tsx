@@ -26,7 +26,11 @@ function PassengerHome() {
   const [destination, setDestination] = useState("");
   const [destLL, setDestLL] = useState<LatLng | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [route, setRoute] = useState<{ distance_km: number; duration_min: number; polyline?: string } | null>(null);
+  const [route, setRoute] = useState<{
+    distance_km: number;
+    duration_min: number;
+    polyline?: string;
+  } | null>(null);
   const [routing, setRouting] = useState(false);
   const [category, setCategory] = useState<VehicleCategory | null>(null);
   const [fare, setFare] = useState<number>(0);
@@ -100,9 +104,7 @@ function PassengerHome() {
         sessionToken: sessionTokenRef.current,
         language: "pt-BR",
         region: "br",
-        locationBias: originLL
-          ? { center: originLL, radius: 30000 }
-          : undefined,
+        locationBias: originLL ? { center: originLL, radius: 30000 } : undefined,
       });
       setSuggestions(
         (sugs ?? [])
@@ -229,7 +231,11 @@ function PassengerHome() {
             </button>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <Quick icon={<HomeIcon className="size-4" />} label="Casa" subtitle="Adicionar" />
-              <Quick icon={<Briefcase className="size-4" />} label="Trabalho" subtitle="Adicionar" />
+              <Quick
+                icon={<Briefcase className="size-4" />}
+                label="Trabalho"
+                subtitle="Adicionar"
+              />
             </div>
           </>
         )}
@@ -261,7 +267,9 @@ function PassengerHome() {
                       <MapPin className="mt-0.5 size-4 text-secondary" />
                       <span>
                         <span className="block text-sm font-semibold">{s.primary}</span>
-                        <span className="block text-[11px] text-muted-foreground">{s.secondary}</span>
+                        <span className="block text-[11px] text-muted-foreground">
+                          {s.secondary}
+                        </span>
                       </span>
                     </button>
                   </li>
@@ -295,28 +303,38 @@ function PassengerHome() {
             >
               {category ? `Solicitar · R$ ${fare.toFixed(2)}` : "Selecione uma categoria"}
             </Button>
-            <Button variant="ghost" className="h-10 w-full text-xs" onClick={() => setStage("destination")}>
+            <Button
+              variant="ghost"
+              className="h-10 w-full text-xs"
+              onClick={() => setStage("destination")}
+            >
               Alterar destino
             </Button>
           </div>
         )}
 
         {stage === "searching" && activeRideId && (
-          <SearchingDriver
-            rideId={activeRideId}
-            onCancelled={resetRide}
-            onCompleted={resetRide}
-          />
+          <SearchingDriver rideId={activeRideId} onCancelled={resetRide} onCompleted={resetRide} />
         )}
       </div>
     </div>
   );
 }
 
-function Quick({ icon, label, subtitle }: { icon: React.ReactNode; label: string; subtitle: string }) {
+function Quick({
+  icon,
+  label,
+  subtitle,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  subtitle: string;
+}) {
   return (
     <button className="flex items-center gap-3 rounded-xl border border-border bg-background p-3 text-left">
-      <span className="grid size-9 place-items-center rounded-lg bg-muted text-secondary">{icon}</span>
+      <span className="grid size-9 place-items-center rounded-lg bg-muted text-secondary">
+        {icon}
+      </span>
       <span>
         <span className="block text-sm font-bold">{label}</span>
         <span className="block text-[11px] text-muted-foreground">{subtitle}</span>
@@ -342,7 +360,9 @@ function Field({
 }) {
   return (
     <div className="flex items-center gap-3 rounded-xl bg-muted px-3 py-2">
-      <span className={`size-3 rounded-full ${icon === "dot-green" ? "bg-emerald-500" : "bg-red-500"}`} />
+      <span
+        className={`size-3 rounded-full ${icon === "dot-green" ? "bg-emerald-500" : "bg-red-500"}`}
+      />
       <MapPin className="size-4 text-muted-foreground" />
       <Input
         className="border-0 bg-transparent px-0 focus-visible:ring-0"

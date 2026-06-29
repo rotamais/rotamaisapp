@@ -7,21 +7,40 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, Clock, FileUp, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
-type DocType =
-  | "identity"
-  | "cnh"
-  | "crlv"
-  | "vehicle_photo"
-  | "insurance"
-  | "vehicle_other";
+type DocType = "identity" | "cnh" | "crlv" | "vehicle_photo" | "insurance" | "vehicle_other";
 
 const DOCS: { type: DocType; title: string; subtitle: string; required: boolean }[] = [
-  { type: "identity", title: "Documento de identidade", subtitle: "RG ou CPF (frente e verso)", required: true },
+  {
+    type: "identity",
+    title: "Documento de identidade",
+    subtitle: "RG ou CPF (frente e verso)",
+    required: true,
+  },
   { type: "cnh", title: "CNH", subtitle: "Habilitação válida (frente e verso)", required: true },
-  { type: "crlv", title: "CRLV do veículo", subtitle: "Documento atualizado do carro", required: true },
-  { type: "vehicle_photo", title: "Foto do veículo", subtitle: "Frente do veículo com a placa visível", required: true },
-  { type: "insurance", title: "Seguro do veículo", subtitle: "Apólice vigente (opcional)", required: false },
-  { type: "vehicle_other", title: "Outros documentos do carro", subtitle: "Laudo, vistoria, autorização etc.", required: false },
+  {
+    type: "crlv",
+    title: "CRLV do veículo",
+    subtitle: "Documento atualizado do carro",
+    required: true,
+  },
+  {
+    type: "vehicle_photo",
+    title: "Foto do veículo",
+    subtitle: "Frente do veículo com a placa visível",
+    required: true,
+  },
+  {
+    type: "insurance",
+    title: "Seguro do veículo",
+    subtitle: "Apólice vigente (opcional)",
+    required: false,
+  },
+  {
+    type: "vehicle_other",
+    title: "Outros documentos do carro",
+    subtitle: "Laudo, vistoria, autorização etc.",
+    required: false,
+  },
 ];
 
 export function DriverDocumentsManager({
@@ -48,7 +67,7 @@ export function DriverDocumentsManager({
   });
 
   const byType = useMemo(() => {
-    const m = new Map<string, typeof documents[number]>();
+    const m = new Map<string, (typeof documents)[number]>();
     // mais recentes primeiro — assumir ordem de chegada da query
     documents.forEach((d) => {
       if (!m.has(d.type)) m.set(d.type, d);
@@ -92,9 +111,21 @@ export function DriverDocumentsManager({
         const url = existing ? urlMap?.[existing.storage_path] : undefined;
         const status = existing
           ? existing.verified
-            ? { label: "Aprovado", icon: <CheckCircle2 className="size-3.5" />, cls: "bg-emerald-500/15 text-emerald-700" }
-            : { label: "Em análise", icon: <Clock className="size-3.5" />, cls: "bg-amber-500/15 text-amber-700" }
-          : { label: d.required ? "Obrigatório" : "Opcional", icon: <FileUp className="size-3.5" />, cls: "bg-muted text-muted-foreground" };
+            ? {
+                label: "Aprovado",
+                icon: <CheckCircle2 className="size-3.5" />,
+                cls: "bg-emerald-500/15 text-emerald-700",
+              }
+            : {
+                label: "Em análise",
+                icon: <Clock className="size-3.5" />,
+                cls: "bg-amber-500/15 text-amber-700",
+              }
+          : {
+              label: d.required ? "Obrigatório" : "Opcional",
+              icon: <FileUp className="size-3.5" />,
+              cls: "bg-muted text-muted-foreground",
+            };
         const isBusy = busy === d.type;
         return (
           <div key={d.type} className="rounded-2xl border border-border bg-card p-4">
@@ -122,7 +153,9 @@ export function DriverDocumentsManager({
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold">{d.title}</p>
                 <p className="text-[11px] text-muted-foreground">{d.subtitle}</p>
-                <span className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${status.cls}`}>
+                <span
+                  className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${status.cls}`}
+                >
                   {status.icon}
                   {status.label}
                 </span>

@@ -39,17 +39,13 @@ export function AvailableRidesList({ onAccepted }: { onAccepted: (rideId: string
           setRides((cur) => (cur.find((x) => x.id === r.id) ? cur : [r, ...cur]));
         },
       )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "rides" },
-        (payload) => {
-          const r = payload.new as any;
-          // Sai da lista se já foi pega ou cancelada
-          if (r.status !== "requested" || r.driver_id) {
-            setRides((cur) => cur.filter((x) => x.id !== r.id));
-          }
-        },
-      )
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "rides" }, (payload) => {
+        const r = payload.new as any;
+        // Sai da lista se já foi pega ou cancelada
+        if (r.status !== "requested" || r.driver_id) {
+          setRides((cur) => cur.filter((x) => x.id !== r.id));
+        }
+      })
       .subscribe();
 
     return () => {

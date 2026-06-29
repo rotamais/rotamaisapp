@@ -8,8 +8,12 @@ declare global {
   }
 }
 
-const TRACKING_ID = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID as string | undefined;
-const BROWSER_KEY = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY as string | undefined;
+const TRACKING_ID = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID as
+  | string
+  | undefined;
+const BROWSER_KEY = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY as
+  | string
+  | undefined;
 
 function loadMaps(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
@@ -66,13 +70,21 @@ export function RealMap({
   const markersRef = useRef<any[]>([]);
   const polyRef = useRef<any>(null);
 
+  const initialCenterRef = useRef(center);
+  const lat = center?.lat;
+  const lng = center?.lng;
+  const originLat = origin?.lat;
+  const originLng = origin?.lng;
+  const destLat = destination?.lat;
+  const destLng = destination?.lng;
+
   useEffect(() => {
     let cancelled = false;
     loadMaps().then(() => {
       if (cancelled || !ref.current || !window.google?.maps) return;
       if (!mapRef.current) {
         mapRef.current = new window.google.maps.Map(ref.current, {
-          center: center ?? { lat: -23.5505, lng: -46.6333 },
+          center: initialCenterRef.current ?? { lat: -23.5505, lng: -46.6333 },
           zoom: 14,
           disableDefaultUI: true,
           gestureHandling: "greedy",
@@ -87,8 +99,10 @@ export function RealMap({
 
   // center
   useEffect(() => {
-    if (mapRef.current && center) mapRef.current.panTo(center);
-  }, [center?.lat, center?.lng]);
+    if (mapRef.current && lat !== undefined && lng !== undefined) {
+      mapRef.current.panTo({ lat, lng });
+    }
+  }, [lat, lng]);
 
   // markers & route
   useEffect(() => {
@@ -98,10 +112,17 @@ export function RealMap({
     if (polyRef.current) polyRef.current.setMap(null);
 
     const g = window.google.maps;
-    if (origin) {
+    const originPos =
+      originLat !== undefined && originLng !== undefined
+        ? { lat: originLat, lng: originLng }
+        : undefined;
+    const destPos =
+      destLat !== undefined && destLng !== undefined ? { lat: destLat, lng: destLng } : undefined;
+
+    if (originPos) {
       markersRef.current.push(
         new g.Marker({
-          position: origin,
+          position: originPos,
           map: mapRef.current,
           icon: {
             path: g.SymbolPath.CIRCLE,
@@ -114,10 +135,10 @@ export function RealMap({
         }),
       );
     }
-    if (destination) {
+    if (destPos) {
       markersRef.current.push(
         new g.Marker({
-          position: destination,
+          position: destPos,
           map: mapRef.current,
           icon: {
             path: g.SymbolPath.CIRCLE,
@@ -142,13 +163,13 @@ export function RealMap({
       const bounds = new g.LatLngBounds();
       path.forEach((p: any) => bounds.extend(p));
       mapRef.current.fitBounds(bounds, 80);
-    } else if (origin && destination) {
+    } else if (originPos && destPos) {
       const bounds = new g.LatLngBounds();
-      bounds.extend(origin);
-      bounds.extend(destination);
+      bounds.extend(originPos);
+      bounds.extend(destPos);
       mapRef.current.fitBounds(bounds, 80);
     }
-  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, polyline]);
+  }, [originLat, originLng, destLat, destLng, polyline]);
 
   if (!BROWSER_KEY) {
     return (

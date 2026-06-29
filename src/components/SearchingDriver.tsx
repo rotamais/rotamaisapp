@@ -120,9 +120,7 @@ export function SearchingDriver({
           </div>
         </div>
         <p className="mt-4 text-base font-bold">Procurando motoristas próximos…</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Avisamos assim que alguém aceitar.
-        </p>
+        <p className="mt-1 text-xs text-muted-foreground">Avisamos assim que alguém aceitar.</p>
         <Button
           variant="outline"
           className="mt-6 h-10 px-6 text-sm"

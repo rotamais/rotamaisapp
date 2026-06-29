@@ -105,16 +105,12 @@ export function IncomingRideCard({
           });
         },
       )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "rides" },
-        (payload) => {
-          const r = payload.new as any;
-          if (r.status !== "requested" || r.driver_id) {
-            setQueue((cur) => cur.filter((x) => x.id !== r.id));
-          }
-        },
-      )
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "rides" }, (payload) => {
+        const r = payload.new as any;
+        if (r.status !== "requested" || r.driver_id) {
+          setQueue((cur) => cur.filter((x) => x.id !== r.id));
+        }
+      })
       .subscribe();
 
     return () => {
@@ -190,23 +186,50 @@ export function IncomingRideCard({
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-muted/60 p-3 text-center text-xs">
-          <Metric label="Distância" value={current.distance_km ? `${current.distance_km.toFixed(1)} km` : "—"} />
-          <Metric label="Duração" value={current.duration_min ? `${Math.round(current.duration_min)} min` : "—"} />
+          <Metric
+            label="Distância"
+            value={current.distance_km ? `${current.distance_km.toFixed(1)} km` : "—"}
+          />
+          <Metric
+            label="Duração"
+            value={current.duration_min ? `${Math.round(current.duration_min)} min` : "—"}
+          />
           <Metric label="Categoria" value={current.vehicle_category ?? "Padrão"} />
         </div>
 
         <div className="mt-4 space-y-2">
-          <Row icon={<MapPin className="size-4 text-emerald-500" />} label="Embarque" text={current.origin_address} />
+          <Row
+            icon={<MapPin className="size-4 text-emerald-500" />}
+            label="Embarque"
+            text={current.origin_address}
+          />
           <div className="ml-2 h-4 w-px border-l border-dashed border-border" />
-          <Row icon={<MapPin className="size-4 text-amber-500" />} label="Destino" text={current.destination_address} />
+          <Row
+            icon={<MapPin className="size-4 text-amber-500" />}
+            label="Destino"
+            text={current.destination_address}
+          />
         </div>
 
         <div className="mt-5 flex gap-2">
-          <Button variant="outline" className="h-14 flex-1 text-sm font-bold" onClick={decline} disabled={accepting}>
+          <Button
+            variant="outline"
+            className="h-14 flex-1 text-sm font-bold"
+            onClick={decline}
+            disabled={accepting}
+          >
             <X className="size-4" /> Recusar
           </Button>
-          <Button className="h-14 flex-[2] text-base font-extrabold" onClick={accept} disabled={accepting}>
-            {accepting ? <Loader2 className="size-5 animate-spin" /> : <Navigation className="size-5" />}
+          <Button
+            className="h-14 flex-[2] text-base font-extrabold"
+            onClick={accept}
+            disabled={accepting}
+          >
+            {accepting ? (
+              <Loader2 className="size-5 animate-spin" />
+            ) : (
+              <Navigation className="size-5" />
+            )}
             {accepting ? "Aceitando" : "Aceitar corrida"}
           </Button>
         </div>
@@ -218,7 +241,9 @@ export function IncomingRideCard({
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
       <p className="mt-0.5 text-sm font-extrabold">{value}</p>
     </div>
   );
@@ -229,7 +254,9 @@ function Row({ icon, label, text }: { icon: React.ReactNode; label: string; text
     <div className="flex items-start gap-3">
       <span className="mt-0.5">{icon}</span>
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </p>
         <p className="truncate text-sm font-semibold">{text}</p>
       </div>
     </div>

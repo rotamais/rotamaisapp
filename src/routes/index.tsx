@@ -5,7 +5,11 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "RotaMais — Sua mobilidade urbana, simplificada" },
-      { name: "description", content: "Solicite corridas, dirija e ganhe. RotaMais conecta passageiros e motoristas em tempo real." },
+      {
+        name: "description",
+        content:
+          "Solicite corridas, dirija e ganhe. RotaMais conecta passageiros e motoristas em tempo real.",
+      },
     ],
   }),
   component: Landing,
@@ -72,25 +76,87 @@ function Landing() {
           <div className="relative">
             <div className="rm-map rm-grid relative aspect-[4/5] w-full overflow-hidden rounded-3xl border border-border shadow-[var(--shadow-card)]">
               {/* Fake roads and active route */}
-              <svg className="absolute inset-0 size-full" viewBox="0 0 400 500" preserveAspectRatio="none">
+              <svg
+                className="absolute inset-0 size-full"
+                viewBox="0 0 400 500"
+                preserveAspectRatio="none"
+              >
                 {/* Secondary grid lines for details */}
-                <path d="M0,100 L400,100 M0,200 L400,200 M0,300 L400,300 M0,400 L400,400 M100,0 L100,500 M200,0 L200,500 M300,0 L300,500" stroke="currentColor" strokeWidth="1" className="text-border/30" />
-                
+                <path
+                  d="M0,100 L400,100 M0,200 L400,200 M0,300 L400,300 M0,400 L400,400 M100,0 L100,500 M200,0 L200,500 M300,0 L300,500"
+                  stroke="currentColor"
+                  strokeWidth="1"
+                  className="text-border/30"
+                />
+
                 {/* Base roads */}
-                <path d="M-50,220 C100,180 200,350 450,300" stroke="currentColor" strokeWidth="10" className="text-muted-foreground/15" fill="none" />
-                <path d="M120,-50 C80,150 320,300 280,550" stroke="currentColor" strokeWidth="10" className="text-muted-foreground/15" fill="none" />
-                <path d="M0,50 C150,120 250,50 400,120" stroke="currentColor" strokeWidth="10" className="text-muted-foreground/15" fill="none" />
-                <path d="M0,380 C120,400 250,320 400,450" stroke="currentColor" strokeWidth="10" className="text-muted-foreground/15" fill="none" />
+                <path
+                  d="M-50,220 C100,180 200,350 450,300"
+                  stroke="currentColor"
+                  strokeWidth="10"
+                  className="text-muted-foreground/15"
+                  fill="none"
+                />
+                <path
+                  d="M120,-50 C80,150 320,300 280,550"
+                  stroke="currentColor"
+                  strokeWidth="10"
+                  className="text-muted-foreground/15"
+                  fill="none"
+                />
+                <path
+                  d="M0,50 C150,120 250,50 400,120"
+                  stroke="currentColor"
+                  strokeWidth="10"
+                  className="text-muted-foreground/15"
+                  fill="none"
+                />
+                <path
+                  d="M0,380 C120,400 250,320 400,450"
+                  stroke="currentColor"
+                  strokeWidth="10"
+                  className="text-muted-foreground/15"
+                  fill="none"
+                />
 
                 {/* Road centerlines */}
-                <path d="M-50,220 C100,180 200,350 450,300" stroke="var(--background)" strokeWidth="2" strokeDasharray="5 5" fill="none" className="opacity-40" />
-                <path d="M120,-50 C80,150 320,300 280,550" stroke="var(--background)" strokeWidth="2" strokeDasharray="5 5" fill="none" className="opacity-40" />
+                <path
+                  d="M-50,220 C100,180 200,350 450,300"
+                  stroke="var(--background)"
+                  strokeWidth="2"
+                  strokeDasharray="5 5"
+                  fill="none"
+                  className="opacity-40"
+                />
+                <path
+                  d="M120,-50 C80,150 320,300 280,550"
+                  stroke="var(--background)"
+                  strokeWidth="2"
+                  strokeDasharray="5 5"
+                  fill="none"
+                  className="opacity-40"
+                />
 
                 {/* Active Route Glow */}
-                <path d="M100,380 C130,300 280,320 280,150" stroke="var(--primary)" strokeWidth="8" strokeLinecap="round" fill="none" className="opacity-30" />
-                
+                <path
+                  d="M100,380 C130,300 280,320 280,150"
+                  stroke="var(--primary)"
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  fill="none"
+                  className="opacity-30"
+                />
+
                 {/* Active Route Dash */}
-                <path d="M100,380 C130,300 280,320 280,150" stroke="var(--primary)" strokeWidth="4" strokeLinecap="round" fill="none" strokeDasharray="14 10" className="animate-route-dash" />
+                <path
+                  d="M100,380 C130,300 280,320 280,150"
+                  stroke="var(--primary)"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  fill="none"
+                  strokeDasharray="14 10"
+                  className="animate-route-dash"
+                />
               </svg>
 
               {/* Uber-like Compass */}
@@ -150,8 +216,12 @@ function Landing() {
               <div className="absolute bottom-4 left-4 right-4 rounded-2xl bg-background/90 p-4 shadow-[var(--shadow-soft)] backdrop-blur border border-border/40">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Próxima corrida</p>
-                    <p className="mt-1 text-sm font-extrabold text-foreground">Av. Paulista → Aeroporto</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Próxima corrida
+                    </p>
+                    <p className="mt-1 text-sm font-extrabold text-foreground">
+                      Av. Paulista → Aeroporto
+                    </p>
                   </div>
                   <div className="text-right flex flex-col items-end gap-1">
                     <span className="inline-flex items-center rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold text-secondary">

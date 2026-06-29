@@ -88,8 +88,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "Rotamais" },
       { name: "twitter:description", content: "Aplicativo de Mobilidade" },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/enCU3qePRuP2LKUQN4Dz1Volm243/social-images/social-1781390628258-ChatGPT_Image_13_de_jun._de_2026,_13_46_21.webp" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/enCU3qePRuP2LKUQN4Dz1Volm243/social-images/social-1781390628258-ChatGPT_Image_13_de_jun._de_2026,_13_46_21.webp" },
+      {
+        property: "og:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/enCU3qePRuP2LKUQN4Dz1Volm243/social-images/social-1781390628258-ChatGPT_Image_13_de_jun._de_2026,_13_46_21.webp",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/enCU3qePRuP2LKUQN4Dz1Volm243/social-images/social-1781390628258-ChatGPT_Image_13_de_jun._de_2026,_13_46_21.webp",
+      },
     ],
     links: [
       {

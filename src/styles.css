@@ -65,29 +65,29 @@
   --primary: oklch(0.83 0.165 84);
   --primary-foreground: oklch(0.18 0.005 270);
   /* Preto profundo #121212 */
-  --secondary: oklch(0.20 0.005 270);
+  --secondary: oklch(0.2 0.005 270);
   --secondary-foreground: oklch(0.99 0 0);
   --muted: oklch(0.965 0.003 270);
   --muted-foreground: oklch(0.46 0.01 270);
   --accent: oklch(0.96 0.04 90);
-  --accent-foreground: oklch(0.20 0.005 270);
+  --accent-foreground: oklch(0.2 0.005 270);
   --destructive: oklch(0.6 0.22 25);
   --destructive-foreground: oklch(0.99 0 0);
   --border: oklch(0.92 0.005 270);
   --input: oklch(0.94 0.005 270);
   --ring: oklch(0.83 0.165 84);
   --chart-1: oklch(0.83 0.165 84);
-  --chart-2: oklch(0.20 0.005 270);
+  --chart-2: oklch(0.2 0.005 270);
   --chart-3: oklch(0.65 0.18 50);
   --chart-4: oklch(0.55 0.15 200);
   --chart-5: oklch(0.7 0.18 145);
-  --sidebar: oklch(0.20 0.005 270);
+  --sidebar: oklch(0.2 0.005 270);
   --sidebar-foreground: oklch(0.98 0 0);
   --sidebar-primary: oklch(0.83 0.165 84);
   --sidebar-primary-foreground: oklch(0.18 0.005 270);
   --sidebar-accent: oklch(0.27 0.008 270);
   --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(0.30 0.008 270);
+  --sidebar-border: oklch(0.3 0.008 270);
   --sidebar-ring: oklch(0.83 0.165 84);
 
   --shadow-card: 0 8px 30px -12px oklch(0 0 0 / 0.18);
@@ -97,9 +97,9 @@
 .dark {
   --background: oklch(0.16 0.004 270);
   --foreground: oklch(0.98 0 0);
-  --card: oklch(0.20 0.005 270);
+  --card: oklch(0.2 0.005 270);
   --card-foreground: oklch(0.98 0 0);
-  --popover: oklch(0.20 0.005 270);
+  --popover: oklch(0.2 0.005 270);
   --popover-foreground: oklch(0.98 0 0);
   --primary: oklch(0.83 0.165 84);
   --primary-foreground: oklch(0.18 0.005 270);
@@ -107,7 +107,7 @@
   --secondary-foreground: oklch(0.98 0 0);
   --muted: oklch(0.24 0.008 270);
   --muted-foreground: oklch(0.7 0.01 270);
-  --accent: oklch(0.30 0.04 90);
+  --accent: oklch(0.3 0.04 90);
   --accent-foreground: oklch(0.98 0 0);
   --destructive: oklch(0.65 0.22 25);
   --destructive-foreground: oklch(0.98 0 0);
@@ -125,8 +125,14 @@
 }
 
 @layer base {
-  * { border-color: var(--color-border); }
-  html, body, #root { height: 100%; }
+  * {
+    border-color: var(--color-border);
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
@@ -144,9 +150,9 @@
 }
 .dark .rm-map {
   background:
-    radial-gradient(circle at 30% 20%, oklch(0.30 0.04 90 / 0.5), transparent 45%),
+    radial-gradient(circle at 30% 20%, oklch(0.3 0.04 90 / 0.5), transparent 45%),
     radial-gradient(circle at 70% 80%, oklch(0.83 0.165 84 / 0.12), transparent 50%),
-    linear-gradient(180deg, oklch(0.20 0.005 270), oklch(0.14 0.005 240));
+    linear-gradient(180deg, oklch(0.2 0.005 270), oklch(0.14 0.005 240));
 }
 .rm-grid {
   background-image:
@@ -161,14 +167,27 @@
 }
 
 @keyframes rm-pulse-ring {
-  0% { transform: scale(0.6); opacity: 0.8; }
-  100% { transform: scale(2.4); opacity: 0; }
+  0% {
+    transform: scale(0.6);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
 }
-.rm-pulse::before, .rm-pulse::after {
-  content: ""; position: absolute; inset: 0; border-radius: 9999px;
-  background: var(--primary); animation: rm-pulse-ring 2s ease-out infinite;
+.rm-pulse::before,
+.rm-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: var(--primary);
+  animation: rm-pulse-ring 2s ease-out infinite;
 }
-.rm-pulse::after { animation-delay: 1s; }
+.rm-pulse::after {
+  animation-delay: 1s;
+}
 
 @keyframes route-flow {
   to {

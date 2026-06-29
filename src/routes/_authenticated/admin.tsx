@@ -105,16 +105,44 @@ function DashboardTab() {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KPI icon={<Users className="size-4" />} label="Usuários" value={data.total_users.toLocaleString("pt-BR")} />
-        <KPI icon={<Car className="size-4" />} label="Motoristas online" value={data.drivers_online.toString()} />
-        <KPI icon={<Activity className="size-4" />} label="Corridas ativas" value={data.rides_in_progress.toString()} />
-        <KPI icon={<CheckCircle2 className="size-4" />} label="Concluídas hoje" value={data.rides_completed_today.toString()} />
+        <KPI
+          icon={<Users className="size-4" />}
+          label="Usuários"
+          value={data.total_users.toLocaleString("pt-BR")}
+        />
+        <KPI
+          icon={<Car className="size-4" />}
+          label="Motoristas online"
+          value={data.drivers_online.toString()}
+        />
+        <KPI
+          icon={<Activity className="size-4" />}
+          label="Corridas ativas"
+          value={data.rides_in_progress.toString()}
+        />
+        <KPI
+          icon={<CheckCircle2 className="size-4" />}
+          label="Concluídas hoje"
+          value={data.rides_completed_today.toString()}
+        />
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
-        <KPI icon={<DollarSign className="size-4" />} label="Receita hoje" value={BRL.format(data.revenue_today)} />
-        <KPI icon={<DollarSign className="size-4" />} label="Receita 7 dias" value={BRL.format(data.revenue_week)} />
-        <KPI icon={<DollarSign className="size-4" />} label="Receita 30 dias" value={BRL.format(data.revenue_month)} />
+        <KPI
+          icon={<DollarSign className="size-4" />}
+          label="Receita hoje"
+          value={BRL.format(data.revenue_today)}
+        />
+        <KPI
+          icon={<DollarSign className="size-4" />}
+          label="Receita 7 dias"
+          value={BRL.format(data.revenue_week)}
+        />
+        <KPI
+          icon={<DollarSign className="size-4" />}
+          label="Receita 30 dias"
+          value={BRL.format(data.revenue_month)}
+        />
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-5">
@@ -254,14 +282,21 @@ function UsersTab() {
           </div>
           <div className="space-y-2">
             {(history ?? []).map((r: any) => (
-              <div key={r.id} className="flex items-center justify-between rounded-lg border border-border p-2.5 text-sm">
+              <div
+                key={r.id}
+                className="flex items-center justify-between rounded-lg border border-border p-2.5 text-sm"
+              >
                 <div>
-                  <p className="font-semibold">{r.origin_address} → {r.destination_address}</p>
+                  <p className="font-semibold">
+                    {r.origin_address} → {r.destination_address}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {new Date(r.created_at).toLocaleString("pt-BR")} · {r.status}
                   </p>
                 </div>
-                <span className="font-bold">{BRL.format(Number(r.final_fare ?? r.estimated_fare ?? 0))}</span>
+                <span className="font-bold">
+                  {BRL.format(Number(r.final_fare ?? r.estimated_fare ?? 0))}
+                </span>
               </div>
             ))}
             {!history?.length && <p className="text-sm text-muted-foreground">Sem corridas.</p>}
@@ -339,7 +374,13 @@ function DriversTab() {
             variant={filter === s ? "default" : "outline"}
             onClick={() => setFilter(s)}
           >
-            {s === "all" ? "Todos" : s === "pending" ? "Pendentes" : s === "verified" ? "Aprovados" : "Suspensos"}
+            {s === "all"
+              ? "Todos"
+              : s === "pending"
+                ? "Pendentes"
+                : s === "verified"
+                  ? "Aprovados"
+                  : "Suspensos"}
           </Button>
         ))}
       </div>
@@ -383,11 +424,18 @@ function DriversTab() {
                     <FileCheck className="size-3.5" /> Docs
                   </Button>
                   {!d.is_verified ? (
-                    <Button size="sm" onClick={() => approve.mutate({ driver_id: d.id, approved: true })}>
+                    <Button
+                      size="sm"
+                      onClick={() => approve.mutate({ driver_id: d.id, approved: true })}
+                    >
                       <CheckCircle2 className="size-3.5" /> Aprovar
                     </Button>
                   ) : (
-                    <Button size="sm" variant="outline" onClick={() => approve.mutate({ driver_id: d.id, approved: false })}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => approve.mutate({ driver_id: d.id, approved: false })}
+                    >
                       <XCircle className="size-3.5" /> Reprovar
                     </Button>
                   )}
@@ -417,7 +465,10 @@ function DriversTab() {
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-bold">
-              Documentos {(documents as any)?.profile?.full_name ? `· ${(documents as any).profile.full_name}` : ""}
+              Documentos{" "}
+              {(documents as any)?.profile?.full_name
+                ? `· ${(documents as any).profile.full_name}`
+                : ""}
             </h3>
             <Button size="sm" variant="ghost" onClick={() => setOpenDocsFor(null)}>
               Fechar
@@ -428,12 +479,15 @@ function DriversTab() {
             <div className="mb-4 grid gap-2 md:grid-cols-2">
               {(documents as any).vehicles.map((v: any) => (
                 <div key={v.id} className="rounded-lg border border-border p-3 text-xs">
-                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Veículo</p>
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Veículo
+                  </p>
                   <p className="mt-0.5 font-semibold text-sm">
                     {v.brand} {v.model} {v.year ? `· ${v.year}` : ""}
                   </p>
                   <p className="text-muted-foreground">
-                    {v.type} · {v.color ?? "cor não informada"} · Placa <span className="font-mono">{v.plate}</span> · {v.seats} lug.
+                    {v.type} · {v.color ?? "cor não informada"} · Placa{" "}
+                    <span className="font-mono">{v.plate}</span> · {v.seats} lug.
                   </p>
                 </div>
               ))}
@@ -442,7 +496,10 @@ function DriversTab() {
 
           <div className="grid gap-2 md:grid-cols-2">
             {((documents as any)?.documents ?? []).map((doc: any) => (
-              <div key={doc.id} className="flex gap-3 rounded-lg border border-border p-2.5 text-sm">
+              <div
+                key={doc.id}
+                className="flex gap-3 rounded-lg border border-border p-2.5 text-sm"
+              >
                 {doc.url ? (
                   /\.(pdf)$/i.test(doc.storage_path) ? (
                     <a
@@ -455,7 +512,11 @@ function DriversTab() {
                     </a>
                   ) : (
                     <a href={doc.url} target="_blank" rel="noreferrer" className="shrink-0">
-                      <img src={doc.url} alt={doc.type} className="size-16 rounded-md object-cover" />
+                      <img
+                        src={doc.url}
+                        alt={doc.type}
+                        className="size-16 rounded-md object-cover"
+                      />
                     </a>
                   )
                 ) : (
@@ -474,11 +535,20 @@ function DriversTab() {
                 </div>
                 <div className="flex shrink-0 flex-col gap-1.5">
                   {doc.verified ? (
-                    <Button size="sm" variant="outline" disabled={revokeDoc.isPending} onClick={() => revokeDoc.mutate(doc.id)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={revokeDoc.isPending}
+                      onClick={() => revokeDoc.mutate(doc.id)}
+                    >
                       Revogar
                     </Button>
                   ) : (
-                    <Button size="sm" disabled={approveDoc.isPending} onClick={() => approveDoc.mutate(doc.id)}>
+                    <Button
+                      size="sm"
+                      disabled={approveDoc.isPending}
+                      onClick={() => approveDoc.mutate(doc.id)}
+                    >
                       Aprovar
                     </Button>
                   )}
@@ -491,7 +561,6 @@ function DriversTab() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
@@ -511,8 +580,19 @@ function RidesTab() {
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         {(["live", "completed", "cancelled", "all"] as const).map((s) => (
-          <Button key={s} size="sm" variant={filter === s ? "default" : "outline"} onClick={() => setFilter(s)}>
-            {s === "live" ? "Em tempo real" : s === "completed" ? "Concluídas" : s === "cancelled" ? "Canceladas" : "Histórico"}
+          <Button
+            key={s}
+            size="sm"
+            variant={filter === s ? "default" : "outline"}
+            onClick={() => setFilter(s)}
+          >
+            {s === "live"
+              ? "Em tempo real"
+              : s === "completed"
+                ? "Concluídas"
+                : s === "cancelled"
+                  ? "Canceladas"
+                  : "Histórico"}
           </Button>
         ))}
       </div>
@@ -536,13 +616,19 @@ function RidesTab() {
                   {r.origin_address} → {r.destination_address}
                 </TableCell>
                 <TableCell>
-                  <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-bold">{r.status}</span>
+                  <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-bold">
+                    {r.status}
+                  </span>
                 </TableCell>
-                <TableCell>{r.distance_km ? `${Number(r.distance_km).toFixed(1)} km` : "—"}</TableCell>
+                <TableCell>
+                  {r.distance_km ? `${Number(r.distance_km).toFixed(1)} km` : "—"}
+                </TableCell>
                 <TableCell className="font-bold">
                   {BRL.format(Number(r.final_fare ?? r.estimated_fare ?? 0))}
                 </TableCell>
-                <TableCell className="text-xs">{r.payment_method} · {r.payment_status}</TableCell>
+                <TableCell className="text-xs">
+                  {r.payment_method} · {r.payment_status}
+                </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
                   {new Date(r.requested_at).toLocaleString("pt-BR")}
                 </TableCell>
@@ -594,13 +680,27 @@ function FinanceTab() {
   return (
     <div className="space-y-5">
       <div className="grid gap-3 md:grid-cols-3">
-        <KPI icon={<DollarSign className="size-4" />} label="Faturamento bruto (30d)" value={BRL.format(data.gross_30d)} />
-        <KPI icon={<DollarSign className="size-4" />} label="Receita da plataforma (30d)" value={BRL.format(data.platform_revenue_30d)} />
-        <KPI icon={<DollarSign className="size-4" />} label="Taxa atual" value={`${data.platform_fee_percent}%`} />
+        <KPI
+          icon={<DollarSign className="size-4" />}
+          label="Faturamento bruto (30d)"
+          value={BRL.format(data.gross_30d)}
+        />
+        <KPI
+          icon={<DollarSign className="size-4" />}
+          label="Receita da plataforma (30d)"
+          value={BRL.format(data.platform_revenue_30d)}
+        />
+        <KPI
+          icon={<DollarSign className="size-4" />}
+          label="Taxa atual"
+          value={`${data.platform_fee_percent}%`}
+        />
       </div>
 
       <div className="rounded-xl border border-border bg-card p-4">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Taxa da plataforma</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+          Taxa da plataforma
+        </h3>
         <div className="mt-3 flex items-center gap-2">
           <Input
             type="number"
@@ -641,9 +741,14 @@ function FinanceTab() {
               <TableRow key={w.id}>
                 <TableCell className="font-mono text-xs">{w.driver_id.slice(0, 8)}</TableCell>
                 <TableCell className="font-bold">{BRL.format(Number(w.amount))}</TableCell>
-                <TableCell className="text-xs">{new Date(w.created_at).toLocaleString("pt-BR")}</TableCell>
+                <TableCell className="text-xs">
+                  {new Date(w.created_at).toLocaleString("pt-BR")}
+                </TableCell>
                 <TableCell className="flex justify-end gap-1.5">
-                  <Button size="sm" onClick={() => processWd.mutate({ withdrawal_id: w.id, status: "paid" })}>
+                  <Button
+                    size="sm"
+                    onClick={() => processWd.mutate({ withdrawal_id: w.id, status: "paid" })}
+                  >
                     Pagar
                   </Button>
                   <Button
@@ -683,7 +788,9 @@ function FinanceTab() {
           <TableBody>
             {data.transactions.slice(0, 30).map((t: any) => (
               <TableRow key={t.id}>
-                <TableCell className="text-xs">{new Date(t.created_at).toLocaleString("pt-BR")}</TableCell>
+                <TableCell className="text-xs">
+                  {new Date(t.created_at).toLocaleString("pt-BR")}
+                </TableCell>
                 <TableCell className="font-bold">{BRL.format(Number(t.amount))}</TableCell>
                 <TableCell className="text-xs uppercase">{t.method}</TableCell>
                 <TableCell>
@@ -721,7 +828,9 @@ function KPI({ icon, label, value }: { icon: React.ReactNode; label: string; val
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
       <div className="flex items-center justify-between text-muted-foreground">
-        <span className="grid size-8 place-items-center rounded-lg bg-muted text-secondary">{icon}</span>
+        <span className="grid size-8 place-items-center rounded-lg bg-muted text-secondary">
+          {icon}
+        </span>
       </div>
       <p className="mt-3 text-xl font-extrabold">{value}</p>
       <p className="text-[11px] text-muted-foreground">{label}</p>

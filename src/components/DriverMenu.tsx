@@ -4,19 +4,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { useNavigate } from "@tanstack/react-router";
 import { getDriverState } from "@/lib/driver.functions";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { DriverDocumentsManager } from "@/components/DriverDocumentsManager";
 import { DriverVehicleSettings } from "@/components/DriverVehicleSettings";
@@ -56,9 +45,7 @@ export function DriverMenu() {
       </SheetTrigger>
       <SheetContent side="right" className="w-full overflow-y-auto p-0 sm:max-w-md">
         <SheetHeader className="border-b border-border p-5">
-          <SheetTitle className="text-left text-lg font-extrabold">
-            Painel do motorista
-          </SheetTitle>
+          <SheetTitle className="text-left text-lg font-extrabold">Painel do motorista</SheetTitle>
         </SheetHeader>
 
         <div className="p-4">

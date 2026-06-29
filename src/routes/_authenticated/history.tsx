@@ -25,7 +25,9 @@ function History() {
         {!isLoading && (!data || data.length === 0) && (
           <div className="rounded-2xl border border-dashed border-border p-8 text-center">
             <p className="text-sm font-semibold">Nenhuma viagem ainda</p>
-            <p className="mt-1 text-xs text-muted-foreground">Sua primeira corrida aparecerá aqui.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Sua primeira corrida aparecerá aqui.
+            </p>
           </div>
         )}
         {data?.map((r) => (
@@ -33,7 +35,10 @@ function History() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-semibold text-muted-foreground">
-                  {new Date(r.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                  {new Date(r.created_at).toLocaleDateString("pt-BR", {
+                    day: "2-digit",
+                    month: "short",
+                  })}
                 </p>
                 <div className="mt-2 flex items-start gap-2">
                   <MapPin className="mt-0.5 size-4 text-emerald-500" />
@@ -45,9 +50,12 @@ function History() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-base font-extrabold">R$ {Number(r.final_fare ?? r.estimated_fare ?? 0).toFixed(2)}</p>
+                <p className="text-base font-extrabold">
+                  R$ {Number(r.final_fare ?? r.estimated_fare ?? 0).toFixed(2)}
+                </p>
                 <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold">
-                  <Star className="size-3 fill-primary text-primary" /> {Number(r.distance_km ?? 0).toFixed(1)} km
+                  <Star className="size-3 fill-primary text-primary" />{" "}
+                  {Number(r.distance_km ?? 0).toFixed(1)} km
                 </p>
               </div>
             </div>

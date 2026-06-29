@@ -7,6 +7,7 @@
 **Arquivo:** `src/lib/driver.functions.ts` (linha 14)
 
 **Alteração:**
+
 ```diff
 - year: z.number().int().min(1980).max(new Date().getFullYear() + 1).optional(),
 + year: z.number().int().min(1980).max(2100).optional(),

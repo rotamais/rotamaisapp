@@ -139,7 +139,11 @@ function openNavigation(lat?: number | null, lng?: number | null) {
 function FakeMap({ active }: { active: boolean }) {
   return (
     <div className="absolute inset-0 overflow-hidden bg-[#1d1f24]">
-      <svg className="absolute inset-0 h-full w-full" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid slice">
+      <svg
+        className="absolute inset-0 h-full w-full"
+        viewBox="0 0 400 600"
+        preserveAspectRatio="xMidYMid slice"
+      >
         <defs>
           <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
             <path d="M40 0H0v40" fill="none" stroke="#262a31" strokeWidth="1" />
@@ -152,7 +156,13 @@ function FakeMap({ active }: { active: boolean }) {
         <path d="M280 -20 L260 620" stroke="#3a3f48" strokeWidth="16" />
         {active && (
           <>
-            <path d="M140 420 C 200 360, 220 300, 270 220" stroke="#FFC107" strokeWidth="5" fill="none" strokeLinecap="round" />
+            <path
+              d="M140 420 C 200 360, 220 300, 270 220"
+              stroke="#FFC107"
+              strokeWidth="5"
+              fill="none"
+              strokeLinecap="round"
+            />
             <circle cx="140" cy="420" r="9" fill="#22c55e" stroke="#fff" strokeWidth="3" />
             <circle cx="270" cy="220" r="9" fill="#FFC107" stroke="#121212" strokeWidth="3" />
           </>
@@ -160,7 +170,12 @@ function FakeMap({ active }: { active: boolean }) {
         <g transform={`translate(${active ? 140 : 200}, ${active ? 420 : 300})`}>
           <circle r="22" fill="#FFC107" opacity="0.18">
             <animate attributeName="r" values="18;30;18" dur="2.4s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="0.25;0;0.25" dur="2.4s" repeatCount="indefinite" />
+            <animate
+              attributeName="opacity"
+              values="0.25;0;0.25"
+              dur="2.4s"
+              repeatCount="indefinite"
+            />
           </circle>
           <circle r="10" fill="#FFC107" stroke="#121212" strokeWidth="2" />
         </g>
@@ -272,7 +287,9 @@ function IdleSheet({
 
       {state === "offline" ? (
         <div className="text-center">
-          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Você está offline</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            Você está offline
+          </p>
           <h2 className="mt-1 text-xl font-extrabold">Toque em Online para receber corridas</h2>
         </div>
       ) : (
@@ -282,14 +299,21 @@ function IdleSheet({
             Aguardando corridas
           </div>
           <h2 className="mt-2 text-lg font-extrabold">Pronto para dirigir</h2>
-          <p className="text-xs text-muted-foreground">Avisamos com som quando chegar uma corrida</p>
+          <p className="text-xs text-muted-foreground">
+            Avisamos com som quando chegar uma corrida
+          </p>
         </div>
       )}
 
       <div className="mt-4 overflow-hidden rounded-2xl border border-border">
-        <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between px-4 py-3 text-left">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="flex w-full items-center justify-between px-4 py-3 text-left"
+        >
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Ganhos de hoje</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Ganhos de hoje
+            </p>
             <p className="text-2xl font-extrabold leading-none">{BRL.format(today)}</p>
           </div>
           {open ? <ChevronDown className="size-5" /> : <ChevronUp className="size-5" />}
@@ -316,10 +340,20 @@ function IdleSheet({
       </div>
 
       <div className="mt-4">
-        <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Performance</p>
+        <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          Performance
+        </p>
         <div className="grid grid-cols-2 gap-2">
-          <PerfCard icon={<Star className="size-4 fill-amber-400 text-amber-400" />} label="Nota" value={Number(stats?.rating ?? 5).toFixed(2)} />
-          <PerfCard icon={<TrendingUp className="size-4 text-emerald-500" />} label="Viagens" value={String(stats?.total_trips ?? 0)} />
+          <PerfCard
+            icon={<Star className="size-4 fill-amber-400 text-amber-400" />}
+            label="Nota"
+            value={Number(stats?.rating ?? 5).toFixed(2)}
+          />
+          <PerfCard
+            icon={<TrendingUp className="size-4 text-emerald-500" />}
+            label="Viagens"
+            value={String(stats?.total_trips ?? 0)}
+          />
         </div>
       </div>
     </div>
@@ -329,7 +363,9 @@ function IdleSheet({
 function Mini({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-card p-3">
-      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
       <p className="mt-0.5 text-base font-extrabold">{value}</p>
     </div>
   );
@@ -340,7 +376,9 @@ function PerfCard({ icon, label, value }: { icon: React.ReactNode; label: string
     <div className="rounded-xl border border-border bg-card p-3">
       <div className="flex items-center gap-1.5">
         {icon}
-        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
+        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </span>
       </div>
       <p className="mt-1 text-lg font-extrabold">{value}</p>
     </div>
@@ -407,7 +445,9 @@ function IncomingRideSheet({
             </p>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-extrabold leading-none">{BRL.format(Number(ride.estimated_fare ?? 0))}</p>
+            <p className="text-2xl font-extrabold leading-none">
+              {BRL.format(Number(ride.estimated_fare ?? 0))}
+            </p>
             <p className="mt-0.5 flex items-center justify-end gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               <CreditCard className="size-3" /> {ride.payment_method ?? "—"}
             </p>
@@ -415,8 +455,14 @@ function IncomingRideSheet({
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-muted/60 p-3 text-center">
-          <Metric label="Distância" value={ride.distance_km ? `${ride.distance_km.toFixed(1)} km` : "—"} />
-          <Metric label="Duração" value={ride.duration_min ? `${Math.round(ride.duration_min)} min` : "—"} />
+          <Metric
+            label="Distância"
+            value={ride.distance_km ? `${ride.distance_km.toFixed(1)} km` : "—"}
+          />
+          <Metric
+            label="Duração"
+            value={ride.duration_min ? `${Math.round(ride.duration_min)} min` : "—"}
+          />
           <Metric label="Categoria" value={(ride.vehicle_category ?? "X").toUpperCase()} />
         </div>
 
@@ -440,7 +486,11 @@ function IncomingRideSheet({
             onClick={onAccept}
             disabled={accepting}
           >
-            {accepting ? <Loader2 className="size-5 animate-spin" /> : <Navigation2 className="size-5" />}
+            {accepting ? (
+              <Loader2 className="size-5 animate-spin" />
+            ) : (
+              <Navigation2 className="size-5" />
+            )}
             {accepting ? "Aceitando" : "Aceitar corrida"}
           </Button>
         </div>
@@ -452,20 +502,34 @@ function IncomingRideSheet({
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
       <p className="mt-0.5 text-sm font-extrabold">{value}</p>
     </div>
   );
 }
 
-function AddrRow({ color, label, text }: { color: "emerald" | "amber"; label: string; text: string }) {
+function AddrRow({
+  color,
+  label,
+  text,
+}: {
+  color: "emerald" | "amber";
+  label: string;
+  text: string;
+}) {
   return (
     <div className="flex items-start gap-3">
       <span className="mt-1">
-        <MapPin className={`size-4 ${color === "emerald" ? "text-emerald-500" : "text-amber-500"}`} />
+        <MapPin
+          className={`size-4 ${color === "emerald" ? "text-emerald-500" : "text-amber-500"}`}
+        />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </p>
         <p className="truncate text-sm font-semibold">{text}</p>
       </div>
     </div>
@@ -551,7 +615,9 @@ function ActiveRideSheet({
     <div className="absolute inset-x-0 bottom-0 z-20 rounded-t-3xl bg-card p-5 pb-[calc(env(safe-area-inset-bottom)+16px)] shadow-2xl">
       <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-muted" />
 
-      <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider ${cfg.chipClass}`}>
+      <div
+        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider ${cfg.chipClass}`}
+      >
         <span className="size-1.5 animate-pulse rounded-full bg-current" />
         {cfg.chip}
       </div>
@@ -564,7 +630,12 @@ function ActiveRideSheet({
               <img src={p.avatar_url} alt="" className="size-12 rounded-full object-cover" />
             ) : (
               <div className="grid size-12 place-items-center rounded-full bg-secondary text-base font-extrabold text-primary">
-                {(p.full_name ?? "U R").split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase()}
+                {(p.full_name ?? "U R")
+                  .split(" ")
+                  .map((s) => s[0])
+                  .slice(0, 2)
+                  .join("")
+                  .toUpperCase()}
               </div>
             )}
             <div className="min-w-0 flex-1">
@@ -617,7 +688,12 @@ function ActiveRideSheet({
 
       <div className="mt-4 flex gap-2">
         {!isCompleted && state !== "in_progress" && (
-          <Button variant="outline" className="h-14 flex-1 text-sm font-bold" onClick={onCancel} disabled={busy}>
+          <Button
+            variant="outline"
+            className="h-14 flex-1 text-sm font-bold"
+            onClick={onCancel}
+            disabled={busy}
+          >
             Cancelar
           </Button>
         )}
@@ -719,7 +795,10 @@ export function DriverPremiumScreen() {
     const tick = () => {
       if (!navigator.geolocation) return;
       navigator.geolocation.getCurrentPosition(
-        (p) => locationFn({ data: { lat: p.coords.latitude, lng: p.coords.longitude, is_online: true } }).catch(() => {}),
+        (p) =>
+          locationFn({
+            data: { lat: p.coords.latitude, lng: p.coords.longitude, is_online: true },
+          }).catch(() => {}),
         () => {},
         { enableHighAccuracy: true, timeout: 6000 },
       );
@@ -745,7 +824,7 @@ export function DriverPremiumScreen() {
             playBeep();
             return next;
           }
-          return prev && list.some((r) => r.id === prev.id) ? prev : next ?? null;
+          return prev && list.some((r) => r.id === prev.id) ? prev : (next ?? null);
         });
       } catch {
         /* ignore */
