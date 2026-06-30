@@ -444,6 +444,62 @@ export const adminProcessWithdrawal = createServerFn({ method: "POST" })
 
 // ============ REPORTS & CHARTS ============
 
+// ============ SUPPORT TICKETS ============
+
+export const adminListTickets = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        status: z.enum(["all", "open", "in_progress", "resolved", "closed"]).default("all"),
+        limit: z.number().int().max(500).default(100),
+      })
+      .parse(d ?? {}),
+  )
+  .handler(async ({ context, data }) => {
+    await ensureAdmin(context);
+    const supabaseAdmin = await getAdminSupabase(context);
+    let q = supabaseAdmin
+      .from("support_tickets")
+      .select("*, user:user_id(id, full_name, phone)")
+      .order("created_at", { ascending: false })
+      .limit(data.limit);
+    if (data.status !== "all") q = q.eq("status", data.status);
+    const { data: tickets, error } = await q;
+    if (error) throw new Error(error.message);
+    return tickets ?? [];
+  });
+
+export const adminUpdateTicket = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        ticket_id: z.string().uuid(),
+        status: z.enum(["open", "in_progress", "resolved", "closed"]).optional(),
+        priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+        assigned_to: z.string().uuid().nullable().optional(),
+        note: z.string().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await ensureAdmin(context);
+    const supabaseAdmin = await getAdminSupabase(context);
+    const update: Record<string, any> = {};
+    if (data.status) update.status = data.status;
+    if (data.priority) update.priority = data.priority;
+    if (data.assigned_to !== undefined) update.assigned_to = data.assigned_to;
+    if (data.status === "resolved") update.resolved_at = new Date().toISOString();
+    if (data.note) update.resolution_note = data.note;
+    const { error } = await supabaseAdmin
+      .from("support_tickets")
+      .update(update)
+      .eq("id", data.ticket_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 export const adminReports = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

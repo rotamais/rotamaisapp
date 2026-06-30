@@ -68,6 +68,8 @@ import {
   adminApproveDocument,
   adminRevokeDocument,
   adminReports,
+  adminListTickets,
+  adminUpdateTicket,
 } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
