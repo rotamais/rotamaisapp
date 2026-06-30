@@ -29,13 +29,25 @@ function createFallbackClient() {
     auth: {
       async getSession() {
         const user = readFallbackSession();
-        return { data: { session: user ? { access_token: "local-fallback-token", user } : null }, error: null };
+        return {
+          data: {
+            session: user ? { access_token: "local-fallback-token", user } : null,
+          },
+          error: null,
+        };
       },
       async getUser() {
         const user = readFallbackSession();
-        return { data: { user: user ? { id: user.id, email: user.email, user_metadata: { full_name: user.full_name } } : null }, error: null };
+        return {
+          data: {
+            user: user
+              ? { id: user.id, email: user.email, user_metadata: { full_name: user.full_name } }
+              : null,
+          },
+          error: null,
+        };
       },
-      async signUp({ email, password, options }: { email: string; password: string; options?: { data?: Record<string, any> } }) {
+      async signUp({ email, options }: { email: string; password: string; options?: { data?: Record<string, any> } }) {
         const id = crypto.randomUUID?.() ?? "local-" + Date.now();
         const user = { id, email, full_name: options?.data?.full_name ?? email };
         writeFallbackSession(user);
@@ -47,10 +59,9 @@ function createFallbackClient() {
           error: null,
         };
       },
-      async signInWithPassword({ email, password: _password }: { email: string; password: string }) {
-        const existing = readFallbackSession();
-        const user = existing ?? { id: "local-" + Date.now(), email, full_name: email };
-        if (!existing) writeFallbackSession(user);
+      async signInWithPassword({ email }: { email: string; password: string }) {
+        const user = readFallbackSession() ?? { id: "local-" + Date.now(), email, full_name: email };
+        writeFallbackSession(user);
         return {
           data: {
             user: { id: user.id, email: user.email, user_metadata: { full_name: user.full_name } },
@@ -67,15 +78,19 @@ function createFallbackClient() {
         const user = readFallbackSession();
         return {
           data: {
-            claims: user
-              ? { sub: user.id, email: user.email, user_metadata: { full_name: user.full_name } }
-              : null,
+            claims: user ? { sub: user.id, email: user.email, user_metadata: { full_name: user.full_name } } : null,
           },
           error: null,
         };
       },
       onAuthStateChange() {
         return { data: { subscription: { unsubscribe() {} } } };
+      },
+      refreshSession() {
+        return Promise.resolve({ data: { session: null }, error: null });
+      },
+      setSession() {
+        return Promise.resolve({ data: { session: null }, error: null });
       },
     },
   } as any;
