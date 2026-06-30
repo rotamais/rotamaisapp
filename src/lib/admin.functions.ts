@@ -441,3 +441,84 @@ export const adminProcessWithdrawal = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ============ REPORTS & CHARTS ============
+
+export const adminReports = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await ensureAdmin(context);
+    const supabaseAdmin = await getAdminSupabase(context);
+    const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString();
+
+    // Rides grouped by day (last 30 days)
+    const { data: rides30 } = await supabaseAdmin
+      .from("rides")
+      .select("id, created_at, status, final_fare")
+      .gte("created_at", daysAgo(30))
+      .order("created_at", { ascending: true });
+
+    // Transactions last 30 days
+    const { data: txns30 } = await supabaseAdmin
+      .from("transactions")
+      .select("id, amount, status, method, created_at")
+      .gte("created_at", daysAgo(30))
+      .order("created_at", { ascending: true });
+
+    // Build daily buckets for rides
+    const rideMap = new Map<string, { total: number; completed: number; cancelled: number }>();
+    const revenueMap = new Map<string, number>();
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+      rideMap.set(d, { total: 0, completed: 0, cancelled: 0 });
+      revenueMap.set(d, 0);
+    }
+    for (const r of (rides30 ?? [])) {
+      const day = new Date(r.created_at).toISOString().slice(0, 10);
+      const entry = rideMap.get(day);
+      if (entry) {
+        entry.total++;
+        if (r.status === "completed") entry.completed++;
+        if (r.status === "cancelled") entry.cancelled++;
+      }
+    }
+    for (const t of (txns30 ?? [])) {
+      if (t.status === "paid") {
+        const day = new Date(t.created_at).toISOString().slice(0, 10);
+        revenueMap.set(day, (revenueMap.get(day) ?? 0) + Number(t.amount));
+      }
+    }
+
+    const ridesByDay = Array.from(rideMap.entries()).map(([date, v]) => ({ date, ...v }));
+    const revenueByDay = Array.from(revenueMap.entries()).map(([date, amount]) => ({ date, amount }));
+
+    // Payment methods distribution
+    const methodCount: Record<string, number> = {};
+    for (const r of (rides30 ?? [])) {
+      if (r.status === "completed" && (r as any).payment_method) {
+        const m = (r as any).payment_method;
+        methodCount[m] = (methodCount[m] ?? 0) + 1;
+      }
+    }
+    const paymentMethods = Object.entries(methodCount).map(([name, value]) => ({ name, value, label: name }));
+
+    // Payment status distribution
+    const statusCount: Record<string, number> = {};
+    for (const t of (txns30 ?? [])) {
+      statusCount[t.status] = (statusCount[t.status] ?? 0) + 1;
+    }
+    const paymentStatus = Object.entries(statusCount).map(([name, value]) => ({ name, value, label: name }));
+
+    // Total completed rides
+    const totalCompleted = (rides30 ?? []).filter((r) => r.status === "completed").length;
+    const totalCancelled = (rides30 ?? []).filter((r) => r.status === "cancelled").length;
+
+    return {
+      rides_by_day: ridesByDay,
+      revenue_by_day: revenueByDay,
+      payment_methods: paymentMethods,
+      payment_status: paymentStatus,
+      total_completed_30d: totalCompleted,
+      total_cancelled_30d: totalCancelled,
+    };
+  });
