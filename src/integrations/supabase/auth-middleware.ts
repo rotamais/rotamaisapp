@@ -5,6 +5,14 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 import { getSupabaseEnv } from "./env";
 
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(atob(token.split(".")[1]));
+  } catch {
+    return null;
+  }
+}
+
 export const requireSupabaseAuth = createMiddleware({ type: "function" }).server(
   async ({ next }) => {
     const { url, publishableKey } = getSupabaseEnv();
@@ -40,6 +48,9 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
       throw new Error("Unauthorized: No token provided");
     }
 
+    let userId: string | null = null;
+
+    // First, try the standard Supabase getClaims verification
     const supabase = createClient<Database>(url, publishableKey, {
       global: {
         headers: {
@@ -53,20 +64,32 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
       },
     });
 
-    const { data, error } = await supabase.auth.getClaims(token);
-    if (error || !data?.claims) {
-      throw new Error("Unauthorized: Invalid token");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsData?.claims?.sub) {
+      userId = claimsData.claims.sub as string;
     }
 
-    if (!data.claims.sub) {
-      throw new Error("Unauthorized: No user ID found in token");
+    // Fallback: decode JWT locally and verify via admin client
+    if (!userId) {
+      const payload = decodeJwtPayload(token);
+      if (!payload?.sub) {
+        const msg = claimsError?.message ?? "Invalid token";
+        throw new Error(`Unauthorized: ${msg}`);
+      }
+
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+      if (userError || !userData?.user) {
+        throw new Error("Unauthorized: Invalid token");
+      }
+      userId = userData.user.id;
     }
 
     return next({
       context: {
         supabase,
-        userId: data.claims.sub,
-        claims: data.claims,
+        userId,
+        claims: { sub: userId },
       },
     });
   },

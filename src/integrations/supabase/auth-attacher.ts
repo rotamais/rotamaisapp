@@ -2,12 +2,31 @@
 import { createMiddleware } from "@tanstack/react-start";
 import { supabase } from "./client";
 
+function decodeToken(token: string): { sub?: string; exp?: number } | null {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return { sub: payload.sub, exp: payload.exp };
+  } catch {
+    return null;
+  }
+}
+
 // Must be registered as a global `functionMiddleware` in `src/start.ts`; otherwise
 // the browser never attaches the bearer token to serverFn RPCs.
 export const attachSupabaseAuth = createMiddleware({ type: "function" }).client(
   async ({ next }) => {
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
+    let session = (await supabase.auth.getSession()).data.session;
+
+    // If token is expired, try to refresh before sending to server
+    if (session?.access_token) {
+      const claims = decodeToken(session.access_token);
+      if (claims?.exp && claims.exp * 1000 < Date.now()) {
+        const { data } = await supabase.auth.refreshSession();
+        session = data.session;
+      }
+    }
+
+    const token = session?.access_token;
     return next({
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
