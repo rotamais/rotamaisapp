@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
+  Bell,
   ChevronDown,
   ChevronUp,
   CreditCard,
@@ -18,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { DriverMenu } from "@/components/DriverMenu";
+import { RealMap, type LatLng } from "@/components/RealMap";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -90,6 +92,37 @@ type CurrentRide = {
   passenger: RidePassenger;
 };
 
+function formatKm(value: number | null | undefined) {
+  return value === null || value === undefined ? "—" : `${value.toFixed(1)} km`;
+}
+
+function formatMin(value: number | null | undefined) {
+  return value === null || value === undefined ? "—" : `${Math.round(value)} min`;
+}
+
+function formatElapsed(from: Date | null) {
+  if (!from) return "—";
+  const diff = Math.max(0, Date.now() - from.getTime());
+  const mins = Math.floor(diff / 60000);
+  const hours = Math.floor(mins / 60);
+  const rest = mins % 60;
+  if (hours > 0) return `${hours}h ${rest}m`;
+  return `${rest}m`;
+}
+
+function calculateDistanceKm(a: LatLng, b: LatLng) {
+  const toRad = (x: number) => (x * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const sinLat = Math.sin(dLat / 2);
+  const sinLng = Math.sin(dLng / 2);
+  const h = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLng * sinLng;
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
 /* ---------- helpers ---------- */
 function playBeep() {
   try {
@@ -136,7 +169,21 @@ function openNavigation(lat?: number | null, lng?: number | null) {
 /* ===========================================================
  * Mapa SVG estilizado (placeholder visual leve)
  * =========================================================== */
-function FakeMap({ active }: { active: boolean }) {
+function FakeMap({
+  active,
+  currentPosition,
+  mapCenter,
+}: {
+  active: boolean;
+  currentPosition?: LatLng | null;
+  mapCenter?: LatLng | null;
+}) {
+  const hotspots = [
+    { x: 70, y: 120, r: 42 },
+    { x: 320, y: 180, r: 38 },
+    { x: 240, y: 420, r: 48 },
+  ];
+  const center = mapCenter ? { x: 200, y: 300 } : { x: 200, y: 300 };
   return (
     <div className="absolute inset-0 overflow-hidden bg-[#1d1f24]">
       <svg
@@ -154,6 +201,19 @@ function FakeMap({ active }: { active: boolean }) {
         <path d="M-20 380 L420 360" stroke="#3a3f48" strokeWidth="18" />
         <path d="M120 -20 L160 620" stroke="#3a3f48" strokeWidth="20" />
         <path d="M280 -20 L260 620" stroke="#3a3f48" strokeWidth="16" />
+        {hotspots.map((spot, index) => (
+          <g key={index}>
+            <circle cx={spot.x} cy={spot.y} r={spot.r} fill="#FFC107" opacity="0.15" />
+            <circle cx={spot.x} cy={spot.y} r={spot.r * 0.55} fill="#FFC107" opacity="0.08" />
+          </g>
+        ))}
+        {currentPosition && (
+          <g>
+            <circle cx={center.x} cy={center.y} r="24" fill="#22c55e" opacity="0.18" />
+            <circle cx={center.x} cy={center.y} r="12" fill="#22c55e" />
+            <circle cx={center.x} cy={center.y} r="5" fill="#fff" />
+          </g>
+        )}
         {active && (
           <>
             <path
@@ -167,7 +227,7 @@ function FakeMap({ active }: { active: boolean }) {
             <circle cx="270" cy="220" r="9" fill="#FFC107" stroke="#121212" strokeWidth="3" />
           </>
         )}
-        <g transform={`translate(${active ? 140 : 200}, ${active ? 420 : 300})`}>
+        <g transform={`translate(${center.x}, ${center.y})`}>
           <circle r="22" fill="#FFC107" opacity="0.18">
             <animate attributeName="r" values="18;30;18" dur="2.4s" repeatCount="indefinite" />
             <animate
@@ -181,6 +241,9 @@ function FakeMap({ active }: { active: boolean }) {
         </g>
       </svg>
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40" />
+      <div className="absolute left-4 top-4 rounded-3xl bg-black/70 px-3 py-2 text-[11px] font-semibold text-white shadow-lg backdrop-blur">
+        Áreas de alta demanda
+      </div>
     </div>
   );
 }
@@ -234,35 +297,73 @@ function SOSButton({ rideId }: { rideId?: string }) {
 /* ===========================================================
  * Status bar superior
  * =========================================================== */
-function StatusBar({
+function HeaderBar({
+  profile,
   isOnline,
   rating,
   onToggleOnline,
   toggling,
 }: {
+  profile?: { avatar_url?: string | null; full_name?: string | null } | null;
   isOnline: boolean;
   rating: number;
   onToggleOnline: () => void;
   toggling: boolean;
 }) {
+  const initials = (profile?.full_name ?? "Motorista")
+    .split(" ")
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
   return (
-    <header className="absolute inset-x-0 top-0 z-30 flex items-center justify-between p-4 pt-[calc(env(safe-area-inset-top)+12px)]">
-      <button
-        onClick={onToggleOnline}
-        disabled={toggling}
-        className={`flex items-center gap-2 rounded-full px-3 py-2 text-xs font-extrabold shadow-lg backdrop-blur transition-colors ${
-          isOnline ? "bg-emerald-500 text-white" : "bg-zinc-900/90 text-zinc-300"
-        } disabled:opacity-70`}
-      >
-        {toggling ? <Loader2 className="size-3.5 animate-spin" /> : <Power className="size-3.5" />}
-        {isOnline ? "Online" : "Você está offline"}
-      </button>
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-2 text-[11px] font-bold text-zinc-900 shadow-lg backdrop-blur">
-          <Star className="size-3.5 fill-amber-400 text-amber-400" />
-          {rating.toFixed(2)}
+    <header className="absolute inset-x-0 top-0 z-30 px-4 pt-[calc(env(safe-area-inset-top)+12px)]">
+      <div className="flex items-center justify-between gap-3 rounded-3xl bg-black/85 px-4 py-3 shadow-2xl ring-1 ring-white/10 backdrop-blur">
+        <div className="flex items-center gap-3">
+          {profile?.avatar_url ? (
+            <img
+              src={profile.avatar_url}
+              alt={profile.full_name ?? "Motorista"}
+              className="h-11 w-11 rounded-full object-cover"
+            />
+          ) : (
+            <div className="grid h-11 w-11 place-items-center rounded-full bg-primary text-sm font-bold text-secondary shadow-sm">
+              {initials}
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white">{profile?.full_name ?? "Motorista"}</p>
+            <div className="mt-0.5 flex items-center gap-1 text-[11px] text-zinc-300">
+              <Star className="size-3.5 fill-amber-400 text-amber-400" />
+              {rating.toFixed(1)}
+            </div>
+          </div>
         </div>
-        <DriverMenu />
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onToggleOnline}
+            disabled={toggling}
+            className={`flex items-center gap-2 rounded-full px-3 py-2 text-xs font-extrabold transition-colors ${
+              isOnline ? "bg-emerald-500 text-white" : "bg-zinc-900/90 text-zinc-300"
+            } disabled:opacity-70`}
+          >
+            {toggling ? <Loader2 className="size-3.5 animate-spin" /> : <Power className="size-3.5" />}
+            {isOnline ? "Online" : "Offline"}
+          </button>
+          <button
+            type="button"
+            className="grid h-11 w-11 place-items-center rounded-full bg-zinc-900/90 text-white shadow-lg"
+            aria-label="Notificações"
+            onClick={() => {
+              /* placeholder */
+            }}
+          >
+            <Bell className="size-5" />
+          </button>
+          <DriverMenu />
+        </div>
       </div>
     </header>
   );
@@ -271,6 +372,40 @@ function StatusBar({
 /* ===========================================================
  * Bottom Sheet: estados sem corrida (offline / online)
  * =========================================================== */
+function DriverControlPanel({
+  onlineSince,
+  autoAccept,
+  onToggleAutoAccept,
+}: {
+  onlineSince: Date | null;
+  autoAccept: boolean;
+  onToggleAutoAccept: () => void;
+}) {
+  return (
+    <div className="absolute left-4 top-[calc(env(safe-area-inset-top)+100px)] z-40 w-[calc(100%-2rem)] max-w-sm rounded-3xl bg-black/70 p-4 shadow-2xl ring-1 ring-white/10 backdrop-blur-md text-white sm:w-auto">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.22em] text-zinc-400">Tempo online</p>
+          <p className="mt-1 text-base font-bold">{formatElapsed(onlineSince)}</p>
+        </div>
+        <div className="rounded-2xl bg-amber-400 px-3 py-1 text-xs font-bold text-zinc-950">Hot Zones</div>
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-3 text-xs">
+        <span className="rounded-full bg-white/10 px-3 py-1">3 zonas ativas</span>
+        <span className="rounded-full bg-white/10 px-3 py-1">Rota curta</span>
+        <button
+          onClick={onToggleAutoAccept}
+          className={`rounded-full px-3 py-1 font-semibold transition ${
+            autoAccept ? "bg-emerald-500 text-black" : "bg-white/10 text-white"
+          }`}
+        >
+          Auto Aceitar {autoAccept ? "ON" : "OFF"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function IdleSheet({
   state,
   stats,
@@ -390,11 +525,13 @@ function PerfCard({ icon, label, value }: { icon: React.ReactNode; label: string
  * =========================================================== */
 function IncomingRideSheet({
   ride,
+  pickupDistance,
   onAccept,
   onDecline,
   accepting,
 }: {
   ride: IncomingRide;
+  pickupDistance?: number | null;
   onAccept: () => void;
   onDecline: () => void;
   accepting: boolean;
@@ -418,71 +555,72 @@ function IncomingRideSheet({
 
   return (
     <div className="absolute inset-0 z-40 flex items-end bg-black/55 backdrop-blur-sm animate-in fade-in">
-      <div className="w-full rounded-t-3xl bg-card p-5 pb-[calc(env(safe-area-inset-bottom)+16px)] shadow-2xl animate-in slide-in-from-bottom-8">
+      <div className="w-full rounded-t-3xl bg-card/95 p-5 pb-[calc(env(safe-area-inset-bottom)+18px)] shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom-8">
         <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-muted" />
 
-        <div className="mb-3 flex items-center justify-between">
-          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-amber-700">
-            Nova solicitação
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Nova solicitação</p>
+            <p className="mt-1 text-sm text-muted-foreground">Aceite rápido para começar a corrida</p>
+          </div>
+          <span className="rounded-full bg-zinc-900/80 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">
+            {secs}s
           </span>
-          <span className="text-xs font-bold text-muted-foreground">{secs}s</span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 rounded-3xl bg-zinc-950/85 p-4 shadow-lg ring-1 ring-white/10">
           {p?.avatar_url ? (
-            <img src={p.avatar_url} alt="" className="size-14 rounded-full object-cover" />
+            <img src={p.avatar_url} alt="" className="h-16 w-16 rounded-2xl object-cover" />
           ) : (
-            <div className="grid size-14 place-items-center rounded-full bg-secondary text-lg font-extrabold text-primary">
+            <div className="grid h-16 w-16 place-items-center rounded-2xl bg-secondary text-lg font-bold text-primary">
               {initials}
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <p className="truncate text-base font-extrabold">{p?.full_name ?? "Passageiro"}</p>
-            <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-              <Star className="size-3.5 fill-amber-400 text-amber-400" />
-              <span className="font-bold text-foreground">{Number(p?.rating ?? 5).toFixed(2)}</span>
-              <span>· {p?.total_rides ?? 0} corridas</span>
+            <p className="truncate text-lg font-extrabold">{p?.full_name ?? "Passageiro"}</p>
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-1">
+                <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                {Number(p?.rating ?? 5).toFixed(1)}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-1">
+                {p?.total_rides ?? 0} viagens
+              </span>
             </p>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-extrabold leading-none">
-              {BRL.format(Number(ride.estimated_fare ?? 0))}
-            </p>
-            <p className="mt-0.5 flex items-center justify-end gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              <CreditCard className="size-3" /> {ride.payment_method ?? "—"}
+            <p className="text-2xl font-extrabold leading-none">{BRL.format(Number(ride.estimated_fare ?? 0))}</p>
+            <p className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+              {ride.payment_method ?? "Pagamento"
+              }
             </p>
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-muted/60 p-3 text-center">
-          <Metric
-            label="Distância"
-            value={ride.distance_km ? `${ride.distance_km.toFixed(1)} km` : "—"}
-          />
-          <Metric
-            label="Duração"
-            value={ride.duration_min ? `${Math.round(ride.duration_min)} min` : "—"}
-          />
-          <Metric label="Categoria" value={(ride.vehicle_category ?? "X").toUpperCase()} />
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <Metric label="Distância até embarque" value={formatKm(pickupDistance)} />
+          <Metric label="Distância total" value={formatKm(ride.distance_km)} />
+          <Metric label="Tempo estimado" value={formatMin(ride.duration_min)} />
+          <Metric label="Pagamento" value={ride.payment_method ?? "—"} />
         </div>
 
-        <div className="mt-4 space-y-2">
+        <div className="mt-4 rounded-3xl bg-zinc-950/85 p-4 shadow-inner ring-1 ring-white/10">
           <AddrRow color="emerald" label="Embarque" text={ride.origin_address} />
-          <div className="ml-2 h-3 w-px border-l border-dashed border-border" />
+          <div className="mx-auto my-3 h-0.5 w-10 rounded-full bg-border" />
           <AddrRow color="amber" label="Destino" text={ride.destination_address} />
         </div>
 
-        <div className="mt-5 flex gap-2">
+        <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_1.4fr]">
           <Button
             variant="secondary"
-            className="h-14 flex-1 bg-zinc-200 text-sm font-bold text-zinc-700 hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-200"
+            className="h-14 w-full rounded-3xl bg-zinc-200 text-sm font-bold text-zinc-700 hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-200"
             onClick={onDecline}
             disabled={accepting}
           >
             <X className="size-4" /> Recusar
           </Button>
           <Button
-            className="h-14 flex-[2] bg-amber-400 text-base font-extrabold text-zinc-900 hover:bg-amber-500"
+            className="h-14 w-full rounded-3xl bg-amber-400 text-base font-extrabold text-zinc-950 hover:bg-amber-500"
             onClick={onAccept}
             disabled={accepting}
           >
@@ -563,7 +701,7 @@ function ActiveRideSheet({
         chipClass: "bg-amber-100 text-amber-800",
         title: ride
           ? `${(ride.distance_km ?? 0).toFixed(1)} km · ${Math.round(ride.duration_min ?? 0)} min`
-          : "",
+          : "A caminho",
         addr: ride?.origin_address ?? "",
         addrLabel: "Embarque",
         navLat: ride?.origin_lat,
@@ -574,7 +712,7 @@ function ActiveRideSheet({
       return {
         chip: "Aguardando passageiro",
         chipClass: "bg-blue-100 text-blue-800",
-        title: "Aguardando embarque",
+        title: "Preparado para embarque",
         addr: ride?.origin_address ?? "",
         addrLabel: "Embarque",
         navLat: ride?.origin_lat,
@@ -586,7 +724,7 @@ function ActiveRideSheet({
         chip: "Corrida em andamento",
         chipClass: "bg-emerald-100 text-emerald-800",
         title: ride
-          ? `${(ride.distance_km ?? 0).toFixed(1)} km · ${Math.round(ride.duration_min ?? 0)} min`
+          ? `${(ride.distance_km ?? 0).toFixed(1)} km · ${Math.round(ride.duration_min ?? 0)} min restantes`
           : "Em viagem",
         addr: ride?.destination_address ?? "",
         addrLabel: "Destino",
@@ -612,98 +750,136 @@ function ActiveRideSheet({
   const isCompleted = state === "completed" || showCompleted;
 
   return (
-    <div className="absolute inset-x-0 bottom-0 z-20 rounded-t-3xl bg-card p-5 pb-[calc(env(safe-area-inset-bottom)+16px)] shadow-2xl">
+    <div className="absolute inset-x-0 bottom-0 z-20 rounded-t-[32px] bg-card/95 p-5 pb-[calc(env(safe-area-inset-bottom)+18px)] shadow-2xl ring-1 ring-white/10 backdrop-blur-xl">
       <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-muted" />
 
-      <div
-        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider ${cfg.chipClass}`}
-      >
-        <span className="size-1.5 animate-pulse rounded-full bg-current" />
-        {cfg.chip}
-      </div>
-      <h2 className="mt-2 text-xl font-extrabold">{cfg.title}</h2>
-
-      {!isCompleted && p && (
-        <>
-          <div className="mt-4 flex items-center gap-3 rounded-2xl border border-border p-3">
-            {p.avatar_url ? (
-              <img src={p.avatar_url} alt="" className="size-12 rounded-full object-cover" />
-            ) : (
-              <div className="grid size-12 place-items-center rounded-full bg-secondary text-base font-extrabold text-primary">
-                {(p.full_name ?? "U R")
-                  .split(" ")
-                  .map((s) => s[0])
-                  .slice(0, 2)
-                  .join("")
-                  .toUpperCase()}
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-extrabold">{p.full_name ?? "Passageiro"}</p>
-              <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <Star className="size-3 fill-amber-400 text-amber-400" />
-                {Number(p.rating ?? 5).toFixed(2)} {p.phone ? `· ${p.phone}` : ""}
-              </p>
-            </div>
-            <button
-              onClick={() => toast("Chat em desenvolvimento")}
-              className="grid size-10 place-items-center rounded-full bg-muted text-foreground"
-              aria-label="Mensagem"
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider ${cfg.chipClass}`}
             >
-              <MessageCircle className="size-4" />
-            </button>
-            {p.phone && (
-              <a
-                href={`tel:${p.phone.replace(/\D/g, "")}`}
-                className="grid size-10 place-items-center rounded-full bg-emerald-500 text-white"
-                aria-label="Ligar"
-              >
-                <Phone className="size-4" />
-              </a>
-            )}
+              <span className="h-2.5 w-2.5 rounded-full animate-pulse bg-current" />
+              {cfg.chip}
+            </div>
+            <h2 className="mt-3 text-2xl font-extrabold leading-tight">{cfg.title}</h2>
           </div>
 
-          <div className="mt-3 space-y-2 rounded-2xl bg-muted/40 p-3">
+          <div className="rounded-3xl bg-zinc-950/80 p-3 text-right shadow-sm ring-1 ring-border">
+            <p className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">Tarifa estimada</p>
+            <p className="mt-1 text-lg font-extrabold">{BRL.format(Number(ride?.estimated_fare ?? 0))}</p>
+          </div>
+        </div>
+
+        {!isCompleted && p && (
+          <div className="rounded-3xl border border-border bg-zinc-950/85 p-4 shadow-lg">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="flex items-center gap-3">
+                {p.avatar_url ? (
+                  <img src={p.avatar_url} alt="" className="h-16 w-16 rounded-2xl object-cover" />
+                ) : (
+                  <div className="grid h-16 w-16 place-items-center rounded-2xl bg-secondary text-lg font-bold text-primary">
+                    {(p.full_name ?? "U R")
+                      .split(" ")
+                      .map((s) => s[0])
+                      .slice(0, 2)
+                      .join("")
+                      .toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="truncate text-base font-extrabold">{p.full_name ?? "Passageiro"}</p>
+                  <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-1">
+                      <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                      {Number(p.rating ?? 5).toFixed(1)}
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-1">
+                      {p.total_rides ?? 0} viagens
+                    </span>
+                  </p>
+                  {p.phone && (
+                    <p className="mt-2 text-xs uppercase tracking-[0.22em] text-muted-foreground">
+                      {p.phone}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 sm:justify-end">
+                <button
+                  onClick={() => toast("Chat em desenvolvimento")}
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-border bg-muted px-4 text-sm font-bold transition hover:bg-white/5"
+                >
+                  <MessageCircle className="size-4" /> Chat
+                </button>
+                {p.phone && (
+                  <a
+                    href={`tel:${p.phone.replace(/\D/g, "")}`}
+                    className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 text-sm font-bold text-black transition hover:bg-emerald-400"
+                  >
+                    <Phone className="size-4" /> Ligar
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="grid gap-3 rounded-3xl bg-zinc-950/85 p-4 shadow-inner ring-1 ring-white/10">
+          <div className="space-y-4">
             <AddrRow color="emerald" label="Embarque" text={ride?.origin_address ?? ""} />
-            <div className="ml-2 h-3 w-px border-l border-dashed border-border" />
+            <div className="h-px bg-border" />
             <AddrRow color="amber" label="Destino" text={ride?.destination_address ?? ""} />
           </div>
 
-          <button
-            onClick={() => openNavigation(cfg.navLat, cfg.navLng)}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-border py-3 text-sm font-bold"
-          >
-            <Navigation2 className="size-4" /> Abrir navegação GPS
-          </button>
-        </>
-      )}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Metric label="Distância" value={`${(ride?.distance_km ?? 0).toFixed(1)} km`} />
+            <Metric label="Tempo" value={`${Math.round(ride?.duration_min ?? 0)} min`} />
+            <Metric label="Pagamento" value={ride?.payment_method ?? "—"} />
+          </div>
 
-      {isCompleted && ride && (
-        <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-muted/60 p-3 text-center">
-          <Metric label="Distância" value={`${(ride.distance_km ?? 0).toFixed(1)} km`} />
-          <Metric label="Duração" value={`${Math.round(ride.duration_min ?? 0)} min`} />
-          <Metric label="Pagamento" value={(ride.payment_method ?? "—").toString()} />
+          {!isCompleted && (
+            <button
+              onClick={() => openNavigation(cfg.navLat, cfg.navLng)}
+              className="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-black/70 py-3 text-sm font-bold text-white transition hover:bg-black"
+            >
+              <Navigation2 className="size-4" /> Abrir navegação GPS
+            </button>
+          )}
         </div>
-      )}
 
-      <div className="mt-4 flex gap-2">
-        {!isCompleted && state !== "in_progress" && (
+        {isCompleted && ride && (
+          <div className="space-y-3 rounded-3xl bg-emerald-500/10 p-4 text-center text-black shadow-sm ring-1 ring-emerald-500/20">
+            <p className="text-sm font-bold uppercase tracking-[0.24em] text-emerald-700">Resumo da corrida</p>
+            <p className="text-2xl font-extrabold">{BRL.format(Number(ride.final_fare ?? ride.estimated_fare ?? 0))}</p>
+            <div className="grid grid-cols-3 gap-2 text-sm">
+              <Metric label="Distância" value={`${(ride.distance_km ?? 0).toFixed(1)} km`} />
+              <Metric label="Duração" value={`${Math.round(ride.duration_min ?? 0)} min`} />
+              <Metric label="Pagamento" value={ride?.payment_method ?? "—"} />
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1.6fr]">
+          {!isCompleted && state !== "in_progress" && (
+            <Button
+              variant="outline"
+              className="h-14 w-full text-sm font-bold"
+              onClick={onCancel}
+              disabled={busy}
+            >
+              Cancelar
+            </Button>
+          )}
           <Button
-            variant="outline"
-            className="h-14 flex-1 text-sm font-bold"
-            onClick={onCancel}
+            className="h-14 w-full rounded-3xl bg-amber-400 text-base font-extrabold text-zinc-900 hover:bg-amber-500"
+            onClick={isCompleted ? onCloseCompleted : onNext}
             disabled={busy}
           >
-            Cancelar
+            {busy ? <Loader2 className="size-5 animate-spin" /> : cfg.cta}
           </Button>
-        )}
-        <Button
-          className="h-14 flex-[2] bg-amber-400 text-base font-extrabold text-zinc-900 hover:bg-amber-500"
-          onClick={isCompleted ? onCloseCompleted : onNext}
-          disabled={busy}
-        >
-          {busy ? <Loader2 className="size-5 animate-spin" /> : cfg.cta}
-        </Button>
+        </div>
       </div>
     </div>
   );
@@ -724,7 +900,7 @@ function useDriverStats() {
 /* ===========================================================
  * Componente principal
  * =========================================================== */
-export function DriverPremiumScreen() {
+export function DriverPremiumScreen({ profile }: { profile?: { avatar_url?: string | null; full_name?: string | null } | null }) {
   const qc = useQueryClient();
   const currentRideFn = useServerFn(getDriverCurrentRide);
   const incomingListFn = useServerFn(listAvailableRidesForDriver);
@@ -749,6 +925,8 @@ export function DriverPremiumScreen() {
   const [busy, setBusy] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [lastCompletedRide, setLastCompletedRide] = useState<CurrentRide | null>(null);
+  const [onlineSince, setOnlineSince] = useState<Date | null>(null);
+  const [autoAccept, setAutoAccept] = useState(false);
   const declined = useRef<Set<string>>(new Set());
 
   const currentRide = currentRideQ.data as CurrentRide | null;
@@ -771,6 +949,7 @@ export function DriverPremiumScreen() {
       try {
         await locationFn({ data: { lat, lng, is_online: target } });
         setIsOnline(target);
+        setOnlineSince(target ? new Date() : null);
         toast.success(target ? "Você está online" : "Você está offline");
       } catch (e: any) {
         toast.error(e?.message ?? "Erro ao atualizar status");
@@ -788,6 +967,14 @@ export function DriverPremiumScreen() {
       send(0, 0);
     }
   }, [isOnline, togglingOnline, locationFn]);
+
+  useEffect(() => {
+    if (!incoming || !autoAccept || accepting) return;
+    const timeout = window.setTimeout(() => {
+      handleAccept();
+    }, 1200);
+    return () => window.clearTimeout(timeout);
+  }, [incoming, autoAccept, accepting]);
 
   /* ===== Pulso de localização a cada 30s quando online ===== */
   useEffect(() => {
@@ -948,16 +1135,85 @@ export function DriverPremiumScreen() {
     derivedState === "completed";
   const mapActive = showActive;
 
+  const [currentPosition, setCurrentPosition] = useState<LatLng | null>(null);
+  const [mapCenter, setMapCenter] = useState<LatLng | null>(null);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    const watcher = navigator.geolocation.watchPosition(
+      (position) => {
+        const loc = { lat: position.coords.latitude, lng: position.coords.longitude };
+        setCurrentPosition(loc);
+        setMapCenter((prev) => prev ?? loc);
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 15_000, timeout: 8000 },
+    );
+    return () => navigator.geolocation.clearWatch(watcher);
+  }, []);
+
+  const centerCurrentLocation = () => {
+    if (currentPosition) setMapCenter(currentPosition);
+  };
+
+  const currentPickupDistance = incoming?.origin_lat && incoming?.origin_lng && currentPosition
+    ? calculateDistanceKm(currentPosition, { lat: incoming.origin_lat, lng: incoming.origin_lng })
+    : null;
+
   return (
-    <div className="relative h-[100dvh] overflow-hidden bg-zinc-950">
-      <FakeMap active={mapActive} />
-      <StatusBar
-        isOnline={isOnline}
-        rating={Number(stats.data?.rating ?? 5)}
-        onToggleOnline={toggleOnline}
-        toggling={togglingOnline}
-      />
-      <SOSButton rideId={currentRide?.id} />
+    <div className="relative min-h-screen overflow-hidden bg-zinc-950 text-white">
+      <div className="relative h-[70vh] min-h-[420px]">
+        <RealMap
+          className="h-full w-full"
+          center={mapCenter ?? currentPosition ?? undefined}
+          origin={currentPosition ?? undefined}
+          destination={
+            incoming?.origin_lat && incoming?.origin_lng
+              ? { lat: incoming.origin_lat, lng: incoming.origin_lng }
+              : currentRide?.status === "in_progress" && currentRide.destination_lat && currentRide.destination_lng
+              ? { lat: currentRide.destination_lat, lng: currentRide.destination_lng }
+              : currentRide?.origin_lat && currentRide?.origin_lng
+              ? { lat: currentRide.origin_lat, lng: currentRide.origin_lng }
+              : undefined
+          }
+        />
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute left-6 top-24 hidden rounded-3xl bg-black/70 px-4 py-3 text-sm text-white shadow-2xl backdrop-blur-md md:block">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-400">Hotzone</p>
+            <p className="mt-1 text-base font-bold">Área de alta demanda</p>
+          </div>
+          <span className="absolute left-12 top-36 block h-28 w-28 rounded-full bg-amber-400/15 blur-3xl" />
+          <span className="absolute right-14 top-28 block h-24 w-24 rounded-full bg-amber-400/15 blur-3xl" />
+          <span className="absolute left-28 bottom-24 block h-32 w-32 rounded-full bg-amber-400/12 blur-3xl" />
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-black/70 text-white shadow-2xl">
+              <MapPin className="size-8 text-amber-400" />
+              <span className="absolute inset-0 rounded-full border border-amber-400/50" />
+            </div>
+          </div>
+        </div>
+        <HeaderBar
+          profile={profile}
+          isOnline={isOnline}
+          rating={Number(stats.data?.rating ?? 5)}
+          onToggleOnline={toggleOnline}
+          toggling={togglingOnline}
+        />
+        <DriverControlPanel
+          onlineSince={onlineSince}
+          autoAccept={autoAccept}
+          onToggleAutoAccept={() => setAutoAccept((active) => !active)}
+        />
+        <button
+          type="button"
+          onClick={centerCurrentLocation}
+          className="absolute right-4 bottom-4 z-40 grid h-12 w-12 place-items-center rounded-full bg-black/80 text-white shadow-lg ring-1 ring-white/10 transition hover:bg-black"
+          aria-label="Centralizar localização"
+        >
+          <Navigation2 className="size-5" />
+        </button>
+        <SOSButton rideId={currentRide?.id} />
+      </div>
 
       {showIdle && <IdleSheet state={derivedState} stats={stats.data} />}
       {showActive && (
@@ -974,6 +1230,7 @@ export function DriverPremiumScreen() {
       {derivedState === "incoming" && incoming && (
         <IncomingRideSheet
           ride={incoming}
+          pickupDistance={currentPickupDistance}
           onAccept={handleAccept}
           onDecline={handleDecline}
           accepting={accepting}

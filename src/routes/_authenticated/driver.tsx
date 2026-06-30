@@ -99,5 +99,5 @@ function DriverRouteComponent() {
   }
 
   // Se estiver tudo ok e verificado, renderiza a tela de corridas do motorista
-  return <DriverPremiumScreen />;
+  return <DriverPremiumScreen profile={meQuery.data?.profile ?? null} />;
 }
