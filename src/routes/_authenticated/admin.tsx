@@ -199,7 +199,7 @@ function AdminPanel() {
 
         {/* Content */}
         <div className="p-4 lg:p-6">
-          {section === "dashboard" && <DashboardSection />}
+          {section === "dashboard" && <DashboardSection setSection={setSection} />}
           {section === "users" && <UsersSection />}
           {section === "drivers" && <DriversSection />}
           {section === "rides" && <RidesSection />}
@@ -219,7 +219,7 @@ function AdminPanel() {
 
 const COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
 
-function DashboardSection() {
+function DashboardSection({ setSection }: { setSection: (s: Section) => void }) {
   const dashFn = useServerFn(adminDashboard);
   const rptFn = useServerFn(adminReports);
   const ridesFn = useServerFn(adminListRides);

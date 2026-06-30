@@ -34,12 +34,12 @@ export function AvailableRidesList({ onAccepted }: { onAccepted: (rideId: string
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "rides", filter: "status=eq.requested" },
-        (payload) => {
+        (payload: any) => {
           const r = payload.new as Ride;
           setRides((cur) => (cur.find((x) => x.id === r.id) ? cur : [r, ...cur]));
         },
       )
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "rides" }, (payload) => {
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "rides" }, (payload: any) => {
         const r = payload.new as any;
         // Sai da lista se já foi pega ou cancelada
         if (r.status !== "requested" || r.driver_id) {

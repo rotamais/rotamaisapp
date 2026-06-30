@@ -15,7 +15,7 @@ function headers() {
 }
 
 export const reverseGeocode = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ lat: z.number(), lng: z.number() }).parse(d))
+  .validator((d: unknown) => z.object({ lat: z.number(), lng: z.number() }).parse(d))
   .handler(async ({ data }) => {
     const url = `${GATEWAY}/maps/api/geocode/json?latlng=${data.lat},${data.lng}&language=pt-BR`;
     const res = await fetch(url, { headers: headers() });
@@ -28,7 +28,7 @@ export const reverseGeocode = createServerFn({ method: "POST" })
   });
 
 export const computeRoute = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         origin: z.object({ lat: z.number(), lng: z.number() }),

@@ -105,7 +105,7 @@ export function IncomingRideCard({
           });
         },
       )
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "rides" }, (payload) => {
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "rides" }, (payload: any) => {
         const r = payload.new as any;
         if (r.status !== "requested" || r.driver_id) {
           setQueue((cur) => cur.filter((x) => x.id !== r.id));

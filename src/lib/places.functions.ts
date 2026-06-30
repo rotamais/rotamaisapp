@@ -24,7 +24,7 @@ const savePlaceSchema = z.object({
 
 export const savePlace = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => savePlaceSchema.parse(d))
+  .validator((d: unknown) => savePlaceSchema.parse(d))
   .handler(async ({ context, data }) => {
     const { error } = await context.supabase
       .from("saved_places")
@@ -40,7 +40,7 @@ export const savePlace = createServerFn({ method: "POST" })
 
 export const deleteSavedPlace = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .validator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ context, data }) => {
     const { error } = await context.supabase
       .from("saved_places")

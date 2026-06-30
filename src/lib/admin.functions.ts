@@ -122,7 +122,7 @@ export const adminDashboard = createServerFn({ method: "GET" })
 
 export const adminListUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({ search: z.string().optional(), limit: z.number().int().max(200).default(100) })
       .parse(d ?? {}),
@@ -143,7 +143,7 @@ export const adminListUsers = createServerFn({ method: "GET" })
 
 export const adminSetUserBlocked = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z.object({ user_id: z.string().uuid(), blocked: z.boolean() }).parse(d),
   )
   .handler(async ({ context, data }) => {
@@ -159,7 +159,7 @@ export const adminSetUserBlocked = createServerFn({ method: "POST" })
 
 export const adminUserHistory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ user_id: z.string().uuid() }).parse(d))
+  .validator((d: unknown) => z.object({ user_id: z.string().uuid() }).parse(d))
   .handler(async ({ context, data }) => {
     await ensureAdmin(context);
     const supabaseAdmin = await getAdminSupabase(context);
@@ -179,7 +179,7 @@ export const adminUserHistory = createServerFn({ method: "GET" })
 
 export const adminListDrivers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({ status: z.enum(["all", "pending", "verified", "suspended"]).default("all") })
       .parse(d ?? {}),
@@ -200,18 +200,18 @@ export const adminListDrivers = createServerFn({ method: "GET" })
     const { data: drivers, error } = await q;
     if (error) throw new Error(error.message);
     if (!drivers?.length) return [];
-    const ids = drivers.map((d) => d.id);
+    const ids = drivers.map((d: { id: string }) => d.id);
     const { data: profiles } = await supabaseAdmin
       .from("profiles")
       .select("id, full_name, phone")
       .in("id", ids);
-    const map = new Map((profiles ?? []).map((p) => [p.id, p]));
-    return drivers.map((d) => ({ ...d, profile: map.get(d.id) ?? null }));
+    const map = new Map((profiles ?? []).map((p: { id: string; full_name: string | null; phone: string | null }) => [p.id, p]));
+    return drivers.map((d: any) => ({ ...d, profile: map.get(d.id) ?? null }));
   });
 
 export const adminApproveDriver = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z.object({ driver_id: z.string().uuid(), approved: z.boolean() }).parse(d),
   )
   .handler(async ({ context, data }) => {
@@ -227,7 +227,7 @@ export const adminApproveDriver = createServerFn({ method: "POST" })
 
 export const adminSuspendDriver = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         driver_id: z.string().uuid(),
@@ -253,7 +253,7 @@ export const adminSuspendDriver = createServerFn({ method: "POST" })
 
 export const adminDriverDocuments = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ driver_id: z.string().uuid() }).parse(d))
+  .validator((d: unknown) => z.object({ driver_id: z.string().uuid() }).parse(d))
   .handler(async ({ context, data }) => {
     await ensureAdmin(context);
     const supabaseAdmin = await getAdminSupabase(context);
@@ -308,7 +308,7 @@ async function setDocumentVerified(
 
 export const adminVerifyDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z.object({ document_id: z.string().uuid(), verified: z.boolean() }).parse(d),
   )
   .handler(async ({ context, data }) =>
@@ -317,19 +317,19 @@ export const adminVerifyDocument = createServerFn({ method: "POST" })
 
 export const adminApproveDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ document_id: z.string().uuid() }).parse(d))
+  .validator((d: unknown) => z.object({ document_id: z.string().uuid() }).parse(d))
   .handler(async ({ context, data }) => setDocumentVerified(context, data.document_id, true));
 
 export const adminRevokeDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ document_id: z.string().uuid() }).parse(d))
+  .validator((d: unknown) => z.object({ document_id: z.string().uuid() }).parse(d))
   .handler(async ({ context, data }) => setDocumentVerified(context, data.document_id, false));
 
 // ============ RIDES ============
 
 export const adminListRides = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         status: z.enum(["all", "live", "completed", "cancelled"]).default("all"),
@@ -376,8 +376,8 @@ export const adminFinance = createServerFn({ method: "GET" })
     ]);
 
     const fee = Number(settings.data?.platform_fee_percent ?? 20);
-    const paid = (txns.data ?? []).filter((t) => t.status === "paid");
-    const gross = paid.reduce((a, t) => a + Number(t.amount), 0);
+    const paid = (txns.data ?? []).filter((t: any) => t.status === "paid");
+    const gross = paid.reduce((a: number, t: any) => a + Number(t.amount), 0);
     const platform_revenue = (gross * fee) / 100;
 
     return {
@@ -391,7 +391,7 @@ export const adminFinance = createServerFn({ method: "GET" })
 
 export const adminUpdatePlatformFee = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ fee_percent: z.number().min(0).max(100) }).parse(d))
+  .validator((d: unknown) => z.object({ fee_percent: z.number().min(0).max(100) }).parse(d))
   .handler(async ({ context, data }) => {
     await ensureAdmin(context);
     const supabaseAdmin = await getAdminSupabase(context);
@@ -417,7 +417,7 @@ export const adminUpdatePlatformFee = createServerFn({ method: "POST" })
 
 export const adminProcessWithdrawal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         withdrawal_id: z.string().uuid(),
@@ -448,7 +448,7 @@ export const adminProcessWithdrawal = createServerFn({ method: "POST" })
 
 export const adminListTickets = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         status: z.enum(["all", "open", "in_progress", "resolved", "closed"]).default("all"),
@@ -472,7 +472,7 @@ export const adminListTickets = createServerFn({ method: "GET" })
 
 export const adminUpdateTicket = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         ticket_id: z.string().uuid(),
@@ -566,8 +566,8 @@ export const adminReports = createServerFn({ method: "GET" })
     const paymentStatus = Object.entries(statusCount).map(([name, value]) => ({ name, value, label: name }));
 
     // Total completed rides
-    const totalCompleted = (rides30 ?? []).filter((r) => r.status === "completed").length;
-    const totalCancelled = (rides30 ?? []).filter((r) => r.status === "cancelled").length;
+    const totalCompleted = (rides30 ?? []).filter((r: any) => r.status === "completed").length;
+    const totalCancelled = (rides30 ?? []).filter((r: any) => r.status === "cancelled").length;
 
     return {
       rides_by_day: ridesByDay,

@@ -768,6 +768,224 @@ export type Database = {
           },
         ];
       };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: Database["public"]["Enums"]["notification_type"];
+          title: string;
+          body: string | null;
+          data: Json;
+          reference_id: string | null;
+          reference_type: string | null;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: Database["public"]["Enums"]["notification_type"];
+          title: string;
+          body?: string | null;
+          data?: Json;
+          reference_id?: string | null;
+          reference_type?: string | null;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: Database["public"]["Enums"]["notification_type"];
+          title?: string;
+          body?: string | null;
+          data?: Json;
+          reference_id?: string | null;
+          reference_type?: string | null;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      saved_places: {
+        Row: {
+          id: string;
+          user_id: string;
+          label: string;
+          address: string;
+          lat: number;
+          lng: number;
+          icon: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          label: string;
+          address: string;
+          lat: number;
+          lng: number;
+          icon?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          label?: string;
+          address?: string;
+          lat?: number;
+          lng?: number;
+          icon?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "saved_places_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      support_tickets: {
+        Row: {
+          id: string;
+          user_id: string;
+          subject: string;
+          message: string;
+          status: Database["public"]["Enums"]["ticket_status"];
+          priority: Database["public"]["Enums"]["ticket_priority"];
+          category: string | null;
+          assigned_to: string | null;
+          created_at: string;
+          updated_at: string;
+          resolved_at: string | null;
+          resolution_note: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          subject: string;
+          message: string;
+          status?: Database["public"]["Enums"]["ticket_status"];
+          priority?: Database["public"]["Enums"]["ticket_priority"];
+          category?: string | null;
+          assigned_to?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          resolved_at?: string | null;
+          resolution_note?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          subject?: string;
+          message?: string;
+          status?: Database["public"]["Enums"]["ticket_status"];
+          priority?: Database["public"]["Enums"]["ticket_priority"];
+          category?: string | null;
+          assigned_to?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          resolved_at?: string | null;
+          resolution_note?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "support_tickets_assigned_to_fkey";
+            columns: ["assigned_to"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      sos_alerts: {
+        Row: {
+          id: string;
+          driver_id: string;
+          ride_id: string | null;
+          lat: number | null;
+          lng: number | null;
+          message: string | null;
+          status: Database["public"]["Enums"]["sos_status"];
+          resolved_at: string | null;
+          resolved_by: string | null;
+          resolution_note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          driver_id: string;
+          ride_id?: string | null;
+          lat?: number | null;
+          lng?: number | null;
+          message?: string | null;
+          status?: Database["public"]["Enums"]["sos_status"];
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+          resolution_note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          driver_id?: string;
+          ride_id?: string | null;
+          lat?: number | null;
+          lng?: number | null;
+          message?: string | null;
+          status?: Database["public"]["Enums"]["sos_status"];
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+          resolution_note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sos_alerts_driver_id_fkey";
+            columns: ["driver_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sos_alerts_ride_id_fkey";
+            columns: ["ride_id"];
+            isOneToOne: false;
+            referencedRelation: "rides";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sos_alerts_resolved_by_fkey";
+            columns: ["resolved_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       drivers_public: {
@@ -852,6 +1070,25 @@ export type Database = {
       app_role: "passenger" | "driver" | "admin" | "fleet_operator";
       booking_status: "pending" | "confirmed" | "rejected" | "cancelled";
       carpool_status: "open" | "full" | "in_progress" | "completed" | "cancelled";
+      notification_type:
+        | "ride_request"
+        | "ride_accepted"
+        | "ride_started"
+        | "ride_completed"
+        | "ride_cancelled"
+        | "driver_arrived"
+        | "payment_received"
+        | "payment_failed"
+        | "withdrawal_status"
+        | "document_verified"
+        | "document_rejected"
+        | "driver_approved"
+        | "driver_suspended"
+        | "promotion"
+        | "system";
+      sos_status: "active" | "responding" | "resolved";
+      ticket_priority: "low" | "medium" | "high" | "urgent";
+      ticket_status: "open" | "in_progress" | "resolved" | "closed";
       document_type:
         | "cnh"
         | "crlv"
@@ -999,6 +1236,26 @@ export const Constants = {
       app_role: ["passenger", "driver", "admin", "fleet_operator"],
       booking_status: ["pending", "confirmed", "rejected", "cancelled"],
       carpool_status: ["open", "full", "in_progress", "completed", "cancelled"],
+      notification_type: [
+        "ride_request",
+        "ride_accepted",
+        "ride_started",
+        "ride_completed",
+        "ride_cancelled",
+        "driver_arrived",
+        "payment_received",
+        "payment_failed",
+        "withdrawal_status",
+        "document_verified",
+        "document_rejected",
+        "driver_approved",
+        "driver_suspended",
+        "promotion",
+        "system",
+      ],
+      sos_status: ["active", "responding", "resolved"],
+      ticket_priority: ["low", "medium", "high", "urgent"],
+      ticket_status: ["open", "in_progress", "resolved", "closed"],
       document_type: [
         "cnh",
         "crlv",

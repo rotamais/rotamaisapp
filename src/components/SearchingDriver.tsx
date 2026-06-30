@@ -41,7 +41,7 @@ export function SearchingDriver({
       .select("id,status,driver_id,estimated_fare")
       .eq("id", rideId)
       .maybeSingle()
-      .then(({ data }) => {
+      .then(({ data }: { data: Ride | null }) => {
         if (active && data) setRide(data as Ride);
       });
 
@@ -49,8 +49,8 @@ export function SearchingDriver({
       .channel(`ride-${rideId}`)
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "rides", filter: `id=eq.${rideId}` },
-        (payload) => {
+        { event: "UPDATE", schema: "public", table: "rides", filter: "id=eq.${rideId}" },
+        (payload: any) => {
           setRide(payload.new as Ride);
         },
       )

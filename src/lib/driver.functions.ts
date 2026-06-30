@@ -20,7 +20,7 @@ const onboardingSchema = z.object({
 
 export const submitDriverOnboarding = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => onboardingSchema.parse(d))
+  .validator((d: unknown) => onboardingSchema.parse(d))
   .handler(async ({ context, data }) => {
     const sb = context.supabase;
     const plate = data.vehicle.plate.replace(/[\s-]/g, "").toUpperCase();
@@ -100,7 +100,7 @@ const DOC_TYPES = [
 
 export const registerDriverDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         type: z.enum(DOC_TYPES),
@@ -142,7 +142,7 @@ export const registerDriverDocument = createServerFn({ method: "POST" })
 
 export const getDriverDocumentUrls = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ paths: z.array(z.string().min(1)).max(50) }).parse(d))
+  .validator((d: unknown) => z.object({ paths: z.array(z.string().min(1)).max(50) }).parse(d))
   .handler(async ({ context, data }) => {
     if (!data.paths.length) return {} as Record<string, string>;
     const { data: signed, error } = await context.supabase.storage
@@ -158,7 +158,7 @@ export const getDriverDocumentUrls = createServerFn({ method: "POST" })
 
 export const updateDriverVehicle = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         vehicle_id: z.string().uuid(),
@@ -297,7 +297,7 @@ export const getDriverCurrentRide = createServerFn({ method: "GET" })
 // a interface simples e usa apenas tabelas existentes.
 export const triggerDriverSOS = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z.object({ lat: z.number(), lng: z.number(), ride_id: z.string().uuid().optional() }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -311,7 +311,7 @@ export const triggerDriverSOS = createServerFn({ method: "POST" })
 // Ganhos detalhados do motorista por período (week | month | year)
 export const getDriverEarnings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z.object({ period: z.enum(["week", "month", "year"]).default("week") }).parse(d ?? {}),
   )
   .handler(async ({ context, data }) => {

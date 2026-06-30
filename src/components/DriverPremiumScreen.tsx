@@ -1085,7 +1085,7 @@ export function DriverPremiumScreen({
         { event: "INSERT", schema: "public", table: "rides", filter: "status=eq.requested" },
         () => fetchList(),
       )
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "rides" }, (payload) => {
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "rides" }, (payload: any) => {
         const r = payload.new as any;
         if (r.status !== "requested" || r.driver_id) {
           setIncoming((prev) => (prev && prev.id === r.id ? null : prev));
