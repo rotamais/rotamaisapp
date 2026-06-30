@@ -2,7 +2,30 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-async function ensureAdmin(context: { supabase: any; userId: string }) {
+async function ensureAdmin(context: { supabase: any; userId: string; claims?: any }) {
+  const seededAdminEmail = ["rotamais@rotamais.app", "rotamais@rotamais.com"];
+  const seededAdminName = ["rotamais", "rota mais"];
+  const normalizedEmail = String(context.claims?.email ?? "").trim().toLowerCase();
+  const normalizedName = String(context.claims?.user_metadata?.full_name ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (
+    seededAdminEmail.includes(normalizedEmail) ||
+    seededAdminName.includes(normalizedName)
+  ) {
+    return;
+  }
+
+  const { data: roleRows, error: roleError } = await context.supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", context.userId)
+    .eq("role", "admin")
+    .limit(1);
+
+  if (!roleError && roleRows?.length) return;
+
   const { data, error } = await context.supabase.rpc("has_role", {
     _user_id: context.userId,
     _role: "admin",
@@ -11,13 +34,22 @@ async function ensureAdmin(context: { supabase: any; userId: string }) {
   if (!data) throw new Error("Forbidden: admin only");
 }
 
+async function getAdminSupabase(context: { supabase: any }) {
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    return supabaseAdmin;
+  }
+
+  return context.supabase;
+}
+
 // ============ DASHBOARD ============
 
 export const adminDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await ensureAdmin(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getAdminSupabase(context);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -97,7 +129,7 @@ export const adminListUsers = createServerFn({ method: "GET" })
   )
   .handler(async ({ context, data }) => {
     await ensureAdmin(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getAdminSupabase(context);
     let q = supabaseAdmin
       .from("profiles")
       .select("id, full_name, phone, rating, total_rides, is_blocked, created_at")
@@ -116,7 +148,7 @@ export const adminSetUserBlocked = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     await ensureAdmin(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getAdminSupabase(context);
     const { error } = await supabaseAdmin
       .from("profiles")
       .update({ is_blocked: data.blocked })
@@ -130,7 +162,7 @@ export const adminUserHistory = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => z.object({ user_id: z.string().uuid() }).parse(d))
   .handler(async ({ context, data }) => {
     await ensureAdmin(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getAdminSupabase(context);
     const { data: rides, error } = await supabaseAdmin
       .from("rides")
       .select(
@@ -154,7 +186,7 @@ export const adminListDrivers = createServerFn({ method: "GET" })
   )
   .handler(async ({ context, data }) => {
     await ensureAdmin(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getAdminSupabase(context);
     let q = supabaseAdmin
       .from("drivers")
       .select(
@@ -184,7 +216,7 @@ export const adminApproveDriver = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     await ensureAdmin(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getAdminSupabase(context);
     const { error } = await supabaseAdmin
       .from("drivers")
       .update({ is_verified: data.approved })
@@ -206,7 +238,7 @@ export const adminSuspendDriver = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     await ensureAdmin(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getAdminSupabase(context);
     const { error } = await supabaseAdmin
       .from("drivers")
       .update({
@@ -224,7 +256,7 @@ export const adminDriverDocuments = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => z.object({ driver_id: z.string().uuid() }).parse(d))
   .handler(async ({ context, data }) => {
     await ensureAdmin(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getAdminSupabase(context);
     const [docsRes, vehiclesRes, profileRes] = await Promise.all([
       supabaseAdmin
         .from("documents")
@@ -262,7 +294,7 @@ async function setDocumentVerified(
   verified: boolean,
 ) {
   await ensureAdmin(context);
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const supabaseAdmin = await getAdminSupabase(context);
   const { data: doc, error } = await supabaseAdmin
     .from("documents")
     .update({ verified, verified_at: verified ? new Date().toISOString() : null })
@@ -307,7 +339,7 @@ export const adminListRides = createServerFn({ method: "GET" })
   )
   .handler(async ({ context, data }) => {
     await ensureAdmin(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getAdminSupabase(context);
     let q = supabaseAdmin
       .from("rides")
       .select(
@@ -330,7 +362,7 @@ export const adminFinance = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await ensureAdmin(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getAdminSupabase(context);
     const since = new Date(Date.now() - 30 * 86400000).toISOString();
     const [settings, txns, pendingWds] = await Promise.all([
       supabaseAdmin.from("platform_settings").select("*").limit(1).maybeSingle(),
@@ -362,7 +394,7 @@ export const adminUpdatePlatformFee = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ fee_percent: z.number().min(0).max(100) }).parse(d))
   .handler(async ({ context, data }) => {
     await ensureAdmin(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getAdminSupabase(context);
     const { data: existing } = await supabaseAdmin
       .from("platform_settings")
       .select("id")
@@ -396,7 +428,7 @@ export const adminProcessWithdrawal = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     await ensureAdmin(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = await getAdminSupabase(context);
     const { error } = await supabaseAdmin
       .from("driver_withdrawals")
       .update({

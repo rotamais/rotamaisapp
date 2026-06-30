@@ -66,6 +66,12 @@ function Landing() {
               >
                 Quero dirigir
               </Link>
+              <Link
+                to="/admin-access"
+                className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-5 py-3 text-sm font-bold text-foreground hover:bg-accent"
+              >
+                Acesso admin
+              </Link>
             </div>
             <div className="mt-8 grid grid-cols-3 gap-3 text-xs text-muted-foreground">
               <Feat icon={<Zap className="size-4" />} label="Tempo real" />
