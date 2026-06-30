@@ -15,82 +15,86 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
 
 export const requireSupabaseAuth = createMiddleware({ type: "function" }).server(
   async ({ next }) => {
-    const { url, publishableKey } = getSupabaseEnv();
+    try {
+      const { url, publishableKey } = getSupabaseEnv();
 
-    if (!url || !publishableKey) {
-      const missing = [
-        ...(!url ? ["SUPABASE_URL"] : []),
-        ...(!publishableKey ? ["SUPABASE_PUBLISHABLE_KEY"] : []),
-      ];
-      const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Connect Supabase in Lovable Cloud.`;
-      console.error(`[Supabase] ${message}`);
-      throw new Error(message);
-    }
+      if (!url || !publishableKey) {
+        const missing = [
+          ...(!url ? ["SUPABASE_URL"] : []),
+          ...(!publishableKey ? ["SUPABASE_PUBLISHABLE_KEY"] : []),
+        ];
+        const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Connect Supabase in Lovable Cloud.`;
+        console.error(`[Supabase] ${message}`);
+        throw new Error(message);
+      }
 
-    const request = getRequest();
+      const request = getRequest();
 
-    if (!request?.headers) {
-      throw new Error("Unauthorized: No request headers available");
-    }
+      if (!request?.headers) {
+        throw new Error("Unauthorized: No request headers available");
+      }
 
-    const authHeader = request.headers.get("authorization");
+      const authHeader = request.headers.get("authorization");
 
-    if (!authHeader) {
-      throw new Error("Unauthorized: No authorization header provided");
-    }
+      if (!authHeader) {
+        throw new Error("Unauthorized: No authorization header provided");
+      }
 
-    if (!authHeader.startsWith("Bearer ")) {
-      throw new Error("Unauthorized: Only Bearer tokens are supported");
-    }
+      if (!authHeader.startsWith("Bearer ")) {
+        throw new Error("Unauthorized: Only Bearer tokens are supported");
+      }
 
-    const token = authHeader.replace("Bearer ", "");
-    if (!token) {
-      throw new Error("Unauthorized: No token provided");
-    }
+      const token = authHeader.replace("Bearer ", "");
+      if (!token) {
+        throw new Error("Unauthorized: No token provided");
+      }
 
-    let userId: string | null = null;
+      let userId: string | null = null;
 
-    // First, try the standard Supabase getClaims verification
-    const supabase = createClient<Database>(url, publishableKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
+      // Try standard getClaims first (works for RS256 / ES256 locally, falls back to getUser for HS256)
+      const supabase = createClient<Database>(url, publishableKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      },
-      auth: {
-        storage: undefined,
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
+        auth: {
+          storage: undefined,
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      });
 
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsData?.claims?.sub) {
-      userId = claimsData.claims.sub as string;
-    }
-
-    // Fallback: decode JWT locally and verify via admin client
-    if (!userId) {
-      const payload = decodeJwtPayload(token);
-      if (!payload?.sub) {
-        const msg = claimsError?.message ?? "Invalid token";
-        throw new Error(`Unauthorized: ${msg}`);
+      const { data: claimsData } = await supabase.auth.getClaims(token);
+      if (claimsData?.claims?.sub) {
+        userId = claimsData.claims.sub as string;
       }
 
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
-      if (userError || !userData?.user) {
-        throw new Error("Unauthorized: Invalid token");
-      }
-      userId = userData.user.id;
-    }
+      // Fallback: decode JWT locally and verify via admin client
+      if (!userId) {
+        const payload = decodeJwtPayload(token);
+        if (!payload?.sub) {
+          throw new Error("Unauthorized: Invalid token");
+        }
 
-    return next({
-      context: {
-        supabase,
-        userId,
-        claims: { sub: userId },
-      },
-    });
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+        if (userError || !userData?.user) {
+          throw new Error("Unauthorized: Invalid token");
+        }
+        userId = userData.user.id;
+      }
+
+      return next({
+        context: {
+          supabase,
+          userId,
+          claims: { sub: userId },
+        },
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Invalid token";
+      throw new Error(`Unauthorized: ${message}`);
+    }
   },
 );
