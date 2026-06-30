@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { DriverMenu } from "@/components/DriverMenu";
+import { DriverDocumentsManager } from "@/components/DriverDocumentsManager";
 import { RealMap, type LatLng } from "@/components/RealMap";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -303,12 +304,14 @@ function HeaderBar({
   rating,
   onToggleOnline,
   toggling,
+  canGoOnline,
 }: {
   profile?: { avatar_url?: string | null; full_name?: string | null } | null;
   isOnline: boolean;
   rating: number;
   onToggleOnline: () => void;
   toggling: boolean;
+  canGoOnline: boolean;
 }) {
   const initials = (profile?.full_name ?? "Motorista")
     .split(" ")
@@ -344,13 +347,13 @@ function HeaderBar({
         <div className="flex items-center gap-2">
           <button
             onClick={onToggleOnline}
-            disabled={toggling}
+            disabled={toggling || !canGoOnline}
             className={`flex items-center gap-2 rounded-full px-3 py-2 text-xs font-extrabold transition-colors ${
               isOnline ? "bg-emerald-500 text-white" : "bg-zinc-900/90 text-zinc-300"
-            } disabled:opacity-70`}
+            } ${!canGoOnline ? "cursor-not-allowed opacity-70" : ""} disabled:opacity-70`}
           >
             {toggling ? <Loader2 className="size-3.5 animate-spin" /> : <Power className="size-3.5" />}
-            {isOnline ? "Online" : "Offline"}
+            {canGoOnline ? (isOnline ? "Online" : "Offline") : "Pendente"}
           </button>
           <button
             type="button"
@@ -376,10 +379,12 @@ function DriverControlPanel({
   onlineSince,
   autoAccept,
   onToggleAutoAccept,
+  canGoOnline,
 }: {
   onlineSince: Date | null;
   autoAccept: boolean;
   onToggleAutoAccept: () => void;
+  canGoOnline: boolean;
 }) {
   return (
     <div className="absolute left-4 top-[calc(env(safe-area-inset-top)+100px)] z-40 w-[calc(100%-2rem)] max-w-sm rounded-3xl bg-black/70 p-4 shadow-2xl ring-1 ring-white/10 backdrop-blur-md text-white sm:w-auto">
@@ -395,9 +400,10 @@ function DriverControlPanel({
         <span className="rounded-full bg-white/10 px-3 py-1">Rota curta</span>
         <button
           onClick={onToggleAutoAccept}
+          disabled={!canGoOnline}
           className={`rounded-full px-3 py-1 font-semibold transition ${
             autoAccept ? "bg-emerald-500 text-black" : "bg-white/10 text-white"
-          }`}
+          } ${!canGoOnline ? "cursor-not-allowed opacity-60" : ""}`}
         >
           Auto Aceitar {autoAccept ? "ON" : "OFF"}
         </button>
@@ -409,9 +415,17 @@ function DriverControlPanel({
 function IdleSheet({
   state,
   stats,
+  canGoOnline,
+  userId,
+  documents,
+  vehicleId,
 }: {
   state: DriverState;
   stats: ReturnType<typeof useDriverStats>["data"];
+  canGoOnline: boolean;
+  userId?: string;
+  documents?: Array<{ id: string; type: string; storage_path: string; verified: boolean }>;
+  vehicleId?: string;
 }) {
   const [open, setOpen] = useState(true);
   const today = Number(stats?.earnings_today ?? 0);
@@ -423,20 +437,49 @@ function IdleSheet({
       {state === "offline" ? (
         <div className="text-center">
           <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            Você está offline
+            {canGoOnline ? "Você está offline" : "Cadastro em análise"}
           </p>
-          <h2 className="mt-1 text-xl font-extrabold">Toque em Online para receber corridas</h2>
+          <h2 className="mt-1 text-xl font-extrabold">
+            {canGoOnline ? "Toque em Online para receber corridas" : "Você já pode enviar os documentos do motorista"}
+          </h2>
         </div>
       ) : (
         <div className="text-center">
           <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">
             <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
-            Aguardando corridas
+            {canGoOnline ? "Aguardando corridas" : "Aguardando análise"}
           </div>
-          <h2 className="mt-2 text-lg font-extrabold">Pronto para dirigir</h2>
+          <h2 className="mt-2 text-lg font-extrabold">
+            {canGoOnline ? "Pronto para dirigir" : "Seu cadastro ainda está em revisão"}
+          </h2>
           <p className="text-xs text-muted-foreground">
-            Avisamos com som quando chegar uma corrida
+            {canGoOnline
+              ? "Avisamos com som quando chegar uma corrida"
+              : "Envie os documentos necessários para concluir o cadastro de motorista."}
           </p>
+        </div>
+      )}
+
+      {!canGoOnline && (
+        <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-left">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+            Acesso parcial liberado
+          </p>
+          <p className="mt-1 text-sm text-amber-900 dark:text-amber-200">
+            Você pode já subir os documentos exigidos para se tornar motorista de aplicativo.
+            O painel para ficar online será liberado após a aprovação.
+          </p>
+        </div>
+      )}
+
+      {!canGoOnline && userId && (
+        <div className="mt-4">
+          <DriverDocumentsManager
+            userId={userId}
+            documents={documents ?? []}
+            vehicleId={vehicleId}
+            onChanged={() => {}}
+          />
         </div>
       )}
 
@@ -900,7 +943,19 @@ function useDriverStats() {
 /* ===========================================================
  * Componente principal
  * =========================================================== */
-export function DriverPremiumScreen({ profile }: { profile?: { avatar_url?: string | null; full_name?: string | null } | null }) {
+export function DriverPremiumScreen({
+  profile,
+  canGoOnline = true,
+  userId,
+  driverDocuments = [],
+  vehicleId,
+}: {
+  profile?: { avatar_url?: string | null; full_name?: string | null } | null;
+  canGoOnline?: boolean;
+  userId?: string;
+  driverDocuments?: Array<{ id: string; type: string; storage_path: string; verified: boolean }>;
+  vehicleId?: string;
+}) {
   const qc = useQueryClient();
   const currentRideFn = useServerFn(getDriverCurrentRide);
   const incomingListFn = useServerFn(listAvailableRidesForDriver);
@@ -942,6 +997,10 @@ export function DriverPremiumScreen({ profile }: { profile?: { avatar_url?: stri
 
   /* ===== Online toggle: atualiza posição/status no backend ===== */
   const toggleOnline = useCallback(async () => {
+    if (!canGoOnline) {
+      toast.error("Seu cadastro ainda está em análise. Envie os documentos e aguarde a aprovação para ficar online.");
+      return;
+    }
     if (togglingOnline) return;
     setTogglingOnline(true);
     const target = !isOnline;
@@ -966,7 +1025,7 @@ export function DriverPremiumScreen({ profile }: { profile?: { avatar_url?: stri
     } else {
       send(0, 0);
     }
-  }, [isOnline, togglingOnline, locationFn]);
+  }, [canGoOnline, isOnline, togglingOnline, locationFn]);
 
   useEffect(() => {
     if (!incoming || !autoAccept || accepting) return;
@@ -996,7 +1055,7 @@ export function DriverPremiumScreen({ profile }: { profile?: { avatar_url?: stri
 
   /* ===== Carga inicial e Realtime das solicitações ===== */
   useEffect(() => {
-    if (!isOnline || currentRide) {
+    if (!isOnline || !canGoOnline || currentRide) {
       setIncoming(null);
       return;
     }
@@ -1038,7 +1097,7 @@ export function DriverPremiumScreen({ profile }: { profile?: { avatar_url?: stri
       active = false;
       supabase.removeChannel(ch);
     };
-  }, [isOnline, currentRide, incomingListFn]);
+  }, [isOnline, canGoOnline, currentRide, incomingListFn]);
 
   /* ===== Realtime na corrida ativa ===== */
   useEffect(() => {
@@ -1198,11 +1257,13 @@ export function DriverPremiumScreen({ profile }: { profile?: { avatar_url?: stri
           rating={Number(stats.data?.rating ?? 5)}
           onToggleOnline={toggleOnline}
           toggling={togglingOnline}
+          canGoOnline={canGoOnline}
         />
         <DriverControlPanel
           onlineSince={onlineSince}
           autoAccept={autoAccept}
           onToggleAutoAccept={() => setAutoAccept((active) => !active)}
+          canGoOnline={canGoOnline}
         />
         <button
           type="button"
@@ -1215,7 +1276,16 @@ export function DriverPremiumScreen({ profile }: { profile?: { avatar_url?: stri
         <SOSButton rideId={currentRide?.id} />
       </div>
 
-      {showIdle && <IdleSheet state={derivedState} stats={stats.data} />}
+      {showIdle && (
+        <IdleSheet
+          state={derivedState}
+          stats={stats.data}
+          canGoOnline={canGoOnline}
+          userId={userId}
+          documents={driverDocuments}
+          vehicleId={vehicleId}
+        />
+      )}
       {showActive && (
         <ActiveRideSheet
           ride={showCompleted ? lastCompletedRide : currentRide}

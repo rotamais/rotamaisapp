@@ -5,7 +5,7 @@ import { getDriverState } from "@/lib/driver.functions";
 import { getMe } from "@/lib/rotamais.functions";
 import { DriverPremiumScreen } from "@/components/DriverPremiumScreen";
 import { DriverOnboarding } from "@/components/DriverOnboarding";
-import { ArrowLeft, Clock, Loader2, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Loader2, ShieldAlert } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/driver")({
   component: DriverRouteComponent,
@@ -78,26 +78,13 @@ function DriverRouteComponent() {
     );
   }
 
-  // Se o cadastro ainda não foi verificado (aprovado) pelo administrador
-  if (!driver.is_verified) {
-    return (
-      <div className="flex h-screen flex-col items-center justify-center bg-zinc-950 px-6 text-center text-white">
-        <Clock className="size-16 text-amber-500 mb-4 animate-pulse" />
-        <h2 className="text-xl font-extrabold">Cadastro em análise</h2>
-        <p className="mt-2 text-sm text-zinc-400 max-w-md font-medium">
-          Seus dados e documentos estão em processo de validação pelo nosso time administrativo.
-          Você receberá uma notificação quando seu perfil for ativado!
-        </p>
-        <Link
-          to="/profile"
-          className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-zinc-800 px-6 text-sm font-semibold text-white hover:bg-zinc-700"
-        >
-          Voltar para o perfil
-        </Link>
-      </div>
-    );
-  }
-
-  // Se estiver tudo ok e verificado, renderiza a tela de corridas do motorista
-  return <DriverPremiumScreen profile={meQuery.data?.profile ?? null} />;
+  return (
+    <DriverPremiumScreen
+      profile={meQuery.data?.profile ?? null}
+      canGoOnline={Boolean(driver.is_verified)}
+      userId={userId}
+      driverDocuments={driverQuery.data?.documents ?? []}
+      vehicleId={driverQuery.data?.vehicles?.[0]?.id}
+    />
+  );
 }
