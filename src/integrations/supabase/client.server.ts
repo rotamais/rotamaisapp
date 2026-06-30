@@ -4,22 +4,21 @@
 // For user-authenticated queries (with RLS), use the auth middleware instead.
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
+import { getSupabaseEnv } from "./env";
 
 function createSupabaseAdminClient() {
-  const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
+  const { url, serviceRoleKey, publishableKey } = getSupabaseEnv();
 
-  if (!SUPABASE_URL) {
+  if (!url) {
     throw new Error("Missing Supabase environment variable(s): SUPABASE_URL. Connect Supabase in Lovable Cloud.");
   }
 
-  const key = SUPABASE_SERVICE_ROLE_KEY ?? SUPABASE_PUBLISHABLE_KEY;
+  const key = serviceRoleKey ?? publishableKey;
   if (!key) {
     throw new Error("Missing Supabase environment variable(s): SUPABASE_SERVICE_ROLE_KEY or SUPABASE_PUBLISHABLE_KEY. Connect Supabase in Lovable Cloud.");
   }
 
-  return createClient<Database>(SUPABASE_URL, key, {
+  return createClient<Database>(url, key, {
     auth: {
       storage: undefined,
       persistSession: false,

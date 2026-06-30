@@ -41,6 +41,7 @@ import {
   adminApproveDocument,
   adminRevokeDocument,
 } from "@/lib/admin.functions";
+import { getSupabaseEnv } from "@/integrations/supabase/env";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminPanel,
@@ -49,6 +50,13 @@ export const Route = createFileRoute("/_authenticated/admin")({
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 function AdminPanel() {
+  const { url, publishableKey } = getSupabaseEnv();
+  const hasSupabaseConfig = Boolean(url && publishableKey);
+
+  if (!hasSupabaseConfig) {
+    return <LocalAdminPanel />;
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-4 md:px-6">
       <header className="mb-5 flex items-center justify-between">
@@ -86,6 +94,46 @@ function AdminPanel() {
           <FinanceTab />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function LocalAdminPanel() {
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-6 md:px-6">
+      <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Modo local</p>
+            <h1 className="text-2xl font-extrabold">Painel administrativo pronto para uso</h1>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              O acesso admin já está liberado com as credenciais padrões. As informações abaixo são de demonstração até que as chaves reais do Supabase sejam adicionadas.
+            </p>
+          </div>
+          <span className="rounded-full bg-amber-500/15 px-3 py-1 text-xs font-bold text-amber-700">
+            Local • sem banco remoto
+          </span>
+        </div>
+
+        <div className="mt-6 grid gap-3 md:grid-cols-3">
+          <div className="rounded-2xl border border-border bg-background p-4">
+            <p className="text-sm text-muted-foreground">Usuários ativos</p>
+            <p className="mt-2 text-3xl font-extrabold">1</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-background p-4">
+            <p className="text-sm text-muted-foreground">Motoristas online</p>
+            <p className="mt-2 text-3xl font-extrabold">0</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-background p-4">
+            <p className="text-sm text-muted-foreground">Corridas em andamento</p>
+            <p className="mt-2 text-3xl font-extrabold">0</p>
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-dashed border-border bg-background/70 p-4 text-sm text-muted-foreground">
+          Credenciais de acesso: <span className="font-semibold text-foreground">rotamais@rotamais.app</span> / <span className="font-semibold text-foreground">12345678@</span>
+        </div>
+      </div>
     </div>
   );
 }
