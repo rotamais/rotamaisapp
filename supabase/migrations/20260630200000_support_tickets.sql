@@ -12,7 +12,8 @@ CREATE TABLE public.support_tickets (
   assigned_to UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  resolved_at TIMESTAMPTZ
+  resolved_at TIMESTAMPTZ,
+  resolution_note TEXT
 );
 
 CREATE INDEX support_tickets_user_idx ON public.support_tickets(user_id, created_at DESC);

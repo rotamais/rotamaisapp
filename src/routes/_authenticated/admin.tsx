@@ -1110,26 +1110,120 @@ function ReportsSection() {
    SUPPORT
    ============================================================ */
 
+const ticketStatusConfig: Record<string, { label: string; class: string }> = {
+  open: { label: "Aberto", class: "bg-amber-500/15 text-amber-600" },
+  in_progress: { label: "Em andamento", class: "bg-blue-500/15 text-blue-600" },
+  resolved: { label: "Resolvido", class: "bg-emerald-500/15 text-emerald-600" },
+  closed: { label: "Fechado", class: "bg-muted text-muted-foreground" },
+};
+
+const ticketPriorityConfig: Record<string, { label: string; class: string }> = {
+  low: { label: "Baixa", class: "bg-muted text-muted-foreground" },
+  medium: { label: "Média", class: "bg-primary/15 text-primary" },
+  high: { label: "Alta", class: "bg-orange-500/15 text-orange-600" },
+  urgent: { label: "Urgente", class: "bg-destructive/15 text-destructive" },
+};
+
 function SupportSection() {
+  const listFn = useServerFn(adminListTickets);
+  const updateFn = useServerFn(adminUpdateTicket);
+  const qc = useQueryClient();
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const { data: tickets } = useQuery({
+    queryKey: ["admin-tickets", statusFilter],
+    queryFn: () => listFn({ data: { status: statusFilter as any } }),
+    refetchInterval: 15000,
+  });
+
+  const updateTicket = useMutation({
+    mutationFn: (v: { ticket_id: string; status?: string; priority?: string; assigned_to?: string | null }) =>
+      updateFn({ data: v }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-tickets"] });
+      toast.success("Ticket atualizado");
+    },
+  });
+
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card p-12 text-center">
-      <HelpCircle className="size-12 text-muted-foreground" />
-      <h3 className="mt-4 text-lg font-bold">Central de Suporte</h3>
-      <p className="mt-2 max-w-md text-sm text-muted-foreground">
-        Gerencie tickets de suporte, reclamações e dúvidas dos usuários do RotaMais.
-      </p>
-      <div className="mt-6 grid w-full max-w-lg gap-3 md:grid-cols-2">
-        <div className="rounded-xl border border-border bg-background p-4 text-left">
-          <p className="text-sm font-bold">Ticket #001</p>
-          <p className="text-xs text-muted-foreground">Passageiro não consegue solicitar corrida</p>
-          <span className="mt-2 inline-block rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-bold text-amber-600">Aberto</span>
-        </div>
-        <div className="rounded-xl border border-border bg-background p-4 text-left">
-          <p className="text-sm font-bold">Ticket #002</p>
-          <p className="text-xs text-muted-foreground">Motorista com problema no cadastro</p>
-          <span className="mt-2 inline-block rounded-md bg-emerald-500/15 px-2 py-0.5 text-xs font-bold text-emerald-600">Resolvido</span>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+          Tickets ({tickets?.length ?? 0})
+        </h3>
+        <div className="flex gap-2">
+          {["all", "open", "in_progress", "resolved", "closed"].map((s) => (
+            <Button
+              key={s}
+              size="sm"
+              variant={statusFilter === s ? "default" : "outline"}
+              onClick={() => setStatusFilter(s)}
+              className="text-xs"
+            >
+              {s === "all" ? "Todos" : ticketStatusConfig[s]?.label ?? s}
+            </Button>
+          ))}
         </div>
       </div>
+
+      {!tickets ? (
+        <div className="h-48 animate-pulse rounded-2xl bg-muted" />
+      ) : tickets.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card p-12 text-center">
+          <HelpCircle className="size-12 text-muted-foreground" />
+          <h3 className="mt-4 text-lg font-bold">Nenhum ticket</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Nenhum ticket de suporte {statusFilter !== "all" ? `com status "${ticketStatusConfig[statusFilter]?.label}"` : "encontrado"}.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {tickets.map((ticket: any) => (
+            <div key={ticket.id} className="rounded-xl border border-border bg-card p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-bold truncate">{ticket.subject}</p>
+                    <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-bold ${ticketStatusConfig[ticket.status]?.class}`}>
+                      {ticketStatusConfig[ticket.status]?.label ?? ticket.status}
+                    </span>
+                    <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-bold ${ticketPriorityConfig[ticket.priority]?.class}`}>
+                      {ticketPriorityConfig[ticket.priority]?.label ?? ticket.priority}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{ticket.message}</p>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span>Usuário: {ticket.user?.full_name ?? ticket.user_id.slice(0, 8)}</span>
+                    <span>{new Date(ticket.created_at).toLocaleString("pt-BR")}</span>
+                    {ticket.category && <span>Categoria: {ticket.category}</span>}
+                    {ticket.resolved_at && <span>Resolvido em: {new Date(ticket.resolved_at).toLocaleString("pt-BR")}</span>}
+                  </div>
+                </div>
+                <div className="flex shrink-0 gap-1.5">
+                  <select
+                    value={ticket.status}
+                    onChange={(e) => updateTicket.mutate({ ticket_id: ticket.id, status: e.target.value })}
+                    className="rounded-md border border-border bg-background px-2 py-1 text-xs"
+                  >
+                    {Object.entries(ticketStatusConfig).map(([k, v]) => (
+                      <option key={k} value={k}>{v.label}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={ticket.priority}
+                    onChange={(e) => updateTicket.mutate({ ticket_id: ticket.id, priority: e.target.value })}
+                    className="rounded-md border border-border bg-background px-2 py-1 text-xs"
+                  >
+                    {Object.entries(ticketPriorityConfig).map(([k, v]) => (
+                      <option key={k} value={k}>{v.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
