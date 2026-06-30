@@ -3,12 +3,15 @@ import { useEffect, useRef, useState } from "react";
 import { RealMap, type LatLng } from "@/components/RealMap";
 import { VehicleCategoryPicker } from "@/components/VehicleCategoryPicker";
 import { SearchingDriver } from "@/components/SearchingDriver";
+import { NotificationBell } from "@/components/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Briefcase, Home as HomeIcon, Loader2, MapPin, Menu, Search } from "lucide-react";
+import { Briefcase, Heart, Home as HomeIcon, Loader2, MapPin, Menu, Search } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { requestRide } from "@/lib/rotamais.functions";
 import { computeRoute, reverseGeocode } from "@/lib/maps.functions";
+import { listSavedPlaces } from "@/lib/places.functions";
 import type { VehicleCategory } from "@/lib/pricing";
 import { toast } from "sonner";
 
@@ -40,6 +43,12 @@ function PassengerHome() {
   const requestFn = useServerFn(requestRide);
   const reverseFn = useServerFn(reverseGeocode);
   const routeFn = useServerFn(computeRoute);
+  const placesFn = useServerFn(listSavedPlaces);
+
+  const { data: savedPlaces } = useQuery({
+    queryKey: ["saved-places"],
+    queryFn: () => placesFn(),
+  });
 
   const sessionTokenRef = useRef<any>(null);
   const placesReadyRef = useRef(false);
@@ -203,7 +212,7 @@ function PassengerHome() {
           <span className="rounded-full bg-background px-3 py-1.5 text-xs font-semibold shadow-[var(--shadow-soft)]">
             RotaMais
           </span>
-          <div className="size-10" />
+          <NotificationBell />
         </header>
       </div>
 
@@ -230,12 +239,46 @@ function PassengerHome() {
               </span>
             </button>
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <Quick icon={<HomeIcon className="size-4" />} label="Casa" subtitle="Adicionar" />
-              <Quick
-                icon={<Briefcase className="size-4" />}
-                label="Trabalho"
-                subtitle="Adicionar"
-              />
+              {(savedPlaces ?? []).slice(0, 4).map((p: any) => (
+                <button
+                  key={p.id}
+                  onClick={async () => {
+                    setDestination(p.address);
+                    setDestLL({ lat: Number(p.lat), lng: Number(p.lng) });
+                    setSuggestions([]);
+                    if (!originLL) return;
+                    setRouting(true);
+                    try {
+                      const r = await routeFn({
+                        data: { origin: originLL, destination: { lat: Number(p.lat), lng: Number(p.lng) } },
+                      });
+                      setRoute(r);
+                      setStage("select");
+                    } catch (e) {
+                      toast.error(e instanceof Error ? e.message : "Erro ao calcular rota");
+                    } finally {
+                      setRouting(false);
+                    }
+                  }}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-background p-3 text-left"
+                >
+                  <span className="grid size-9 place-items-center rounded-lg bg-muted text-secondary">
+                    {p.icon === "work" ? <Briefcase className="size-4" /> : <HomeIcon className="size-4" />}
+                  </span>
+                  <span>
+                    <span className="block text-sm font-bold">{p.label}</span>
+                    <span className="block truncate text-[11px] text-muted-foreground max-w-[120px]">
+                      {p.address}
+                    </span>
+                  </span>
+                </button>
+              ))}
+              {!(savedPlaces ?? []).length && (
+                <>
+                  <Quick icon={<HomeIcon className="size-4" />} label="Casa" subtitle="Adicionar" />
+                  <Quick icon={<Briefcase className="size-4" />} label="Trabalho" subtitle="Adicionar" />
+                </>
+              )}
             </div>
           </>
         )}
