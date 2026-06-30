@@ -29,30 +29,34 @@ function createFallbackClient() {
     auth: {
       async getSession() {
         const user = readFallbackSession();
-        return { data: { session: user ? { access_token: "local-admin-token", user } : null }, error: null };
+        return { data: { session: user ? { access_token: "local-fallback-token", user } : null }, error: null };
       },
       async getUser() {
         const user = readFallbackSession();
         return { data: { user: user ? { id: user.id, email: user.email, user_metadata: { full_name: user.full_name } } : null }, error: null };
       },
-      async signInWithPassword({ email, password }: { email: string; password: string }) {
-        const expectedEmail = "rotamais@rotamais.app";
-        const expectedPassword = "12345678@";
-        if (email === expectedEmail && password === expectedPassword) {
-          const user = { id: "local-admin", email, full_name: "rotamais" };
-          writeFallbackSession(user);
-          return {
-            data: {
-              user: { id: user.id, email: user.email, user_metadata: { full_name: user.full_name } },
-              session: { access_token: "local-admin-token", user: { id: user.id, email: user.email } },
-            },
-            error: null,
-          };
-        }
-        writeFallbackSession(null);
+      async signUp({ email, password, options }: { email: string; password: string; options?: { data?: Record<string, any> } }) {
+        const id = crypto.randomUUID?.() ?? "local-" + Date.now();
+        const user = { id, email, full_name: options?.data?.full_name ?? email };
+        writeFallbackSession(user);
         return {
-          data: { user: null, session: null },
-          error: { message: "Credenciais inválidas para acesso administrativo" },
+          data: {
+            user: { id: user.id, email: user.email, user_metadata: { full_name: user.full_name } },
+            session: { access_token: "local-fallback-token", user: { id: user.id, email: user.email } },
+          },
+          error: null,
+        };
+      },
+      async signInWithPassword({ email, password: _password }: { email: string; password: string }) {
+        const existing = readFallbackSession();
+        const user = existing ?? { id: "local-" + Date.now(), email, full_name: email };
+        if (!existing) writeFallbackSession(user);
+        return {
+          data: {
+            user: { id: user.id, email: user.email, user_metadata: { full_name: user.full_name } },
+            session: { access_token: "local-fallback-token", user: { id: user.id, email: user.email } },
+          },
+          error: null,
         };
       },
       async signOut() {
@@ -69,6 +73,9 @@ function createFallbackClient() {
           },
           error: null,
         };
+      },
+      onAuthStateChange() {
+        return { data: { subscription: { unsubscribe() {} } } };
       },
     },
   } as any;
