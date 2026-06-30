@@ -1,3 +1,14 @@
+# Env files
+.env
+.env.local
+.env.*.local
+
+# Supabase temp files
+supabase/.temp/
+
+# One-time scripts
+scripts/
+
 # Logs
 logs
 *.log
