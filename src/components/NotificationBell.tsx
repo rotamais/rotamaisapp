@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Bell, CheckCheck, Loader2 } from "lucide-react";
@@ -8,6 +8,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 import {
   listNotifications,
   getUnreadCount,
@@ -51,6 +52,28 @@ export function NotificationBell() {
       qc.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("notifications-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["notification-count"] });
+          qc.invalidateQueries({ queryKey: ["notifications"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "notifications" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["notification-count"] });
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [qc]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

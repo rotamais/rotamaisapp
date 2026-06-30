@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import {
   Activity,
+  AlertTriangle,
   BarChart3,
   Car,
   CheckCircle2,
@@ -1006,6 +1007,16 @@ function PaymentsSection() {
    REPORTS
    ============================================================ */
 
+function downloadCSV(filename: string, headers: string[], rows: any[][]) {
+  const csv = [headers.join(","), ...rows.map((r) => r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))].join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 function ReportsSection() {
   const rptFn = useServerFn(adminReports);
   const { data } = useQuery({ queryKey: ["admin-reports"], queryFn: () => rptFn() });
@@ -1016,18 +1027,43 @@ function ReportsSection() {
     </div>;
   }
 
+  const exportRides = () => downloadCSV(
+    "corridas-30d.csv",
+    ["Data", "Total", "Concluídas", "Canceladas"],
+    data.rides_by_day.map((r: any) => [r.date, r.total, r.completed, r.cancelled]),
+  );
+
+  const exportRevenue = () => downloadCSV(
+    "receita-30d.csv",
+    ["Data", "Receita"],
+    data.revenue_by_day.map((r: any) => [r.date, r.amount]),
+  );
+
+  const exportPayments = () => {
+    const methods = data.payment_methods.map((p: any) => [p.name, p.value]);
+    const statuses = data.payment_status.map((p: any) => [p.name, p.value]);
+    downloadCSV("pagamentos-30d.csv", ["Método", "Qtd", "Status", "Qtd"], methods.map((m: any[], i: number) => [...m, statuses[i] ?? [""]]));
+  };
+
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-3">
-        <KpiCard icon={<Activity className="size-5" />} label="Corridas concluídas (30d)" value={data.total_completed_30d.toString()} />
-        <KpiCard icon={<XCircle className="size-5" />} label="Canceladas (30d)" value={data.total_cancelled_30d.toString()} />
-        <KpiCard
-          icon={<BarChart3 className="size-5" />}
-          label="Taxa de conclusão"
-          value={data.total_completed_30d + data.total_cancelled_30d > 0
-            ? `${((data.total_completed_30d / (data.total_completed_30d + data.total_cancelled_30d)) * 100).toFixed(1)}%`
-            : "—"}
-        />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="grid gap-4 md:grid-cols-3 flex-1">
+          <KpiCard icon={<Activity className="size-5" />} label="Corridas concluídas (30d)" value={data.total_completed_30d.toString()} />
+          <KpiCard icon={<XCircle className="size-5" />} label="Canceladas (30d)" value={data.total_cancelled_30d.toString()} />
+          <KpiCard
+            icon={<BarChart3 className="size-5" />}
+            label="Taxa de conclusão"
+            value={data.total_completed_30d + data.total_cancelled_30d > 0
+              ? `${((data.total_completed_30d / (data.total_completed_30d + data.total_cancelled_30d)) * 100).toFixed(1)}%`
+              : "—"}
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={exportRides}><Download className="size-3.5 mr-1" />Corridas</Button>
+          <Button size="sm" variant="outline" onClick={exportRevenue}><Download className="size-3.5 mr-1" />Receita</Button>
+          <Button size="sm" variant="outline" onClick={exportPayments}><Download className="size-3.5 mr-1" />Pagamentos</Button>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -1129,12 +1165,15 @@ function SupportSection() {
   const updateFn = useServerFn(adminUpdateTicket);
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showEmergencies, setShowEmergencies] = useState(false);
 
   const { data: tickets } = useQuery({
-    queryKey: ["admin-tickets", statusFilter],
-    queryFn: () => listFn({ data: { status: statusFilter as any } }),
-    refetchInterval: 15000,
+    queryKey: ["admin-tickets", showEmergencies ? "urgent" : statusFilter],
+    queryFn: () => listFn({ data: { status: showEmergencies ? "all" : statusFilter as any } }),
+    refetchInterval: showEmergencies ? 5000 : 15000,
   });
+
+  const emergencies = tickets?.filter((t: any) => t.priority === "urgent" && t.status !== "resolved" && t.status !== "closed") ?? [];
 
   const updateTicket = useMutation({
     mutationFn: (v: { ticket_id: string; status?: string; priority?: string; assigned_to?: string | null }) =>
@@ -1147,6 +1186,70 @@ function SupportSection() {
 
   return (
     <div className="space-y-5">
+      {/* SOS/Emergency banner */}
+      {emergencies.length > 0 && (
+        <div className="rounded-2xl border-2 border-destructive/40 bg-destructive/5 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="size-5 text-destructive animate-pulse" />
+              <h3 className="text-sm font-extrabold text-destructive">
+                {emergencies.length} emergência{emergencies.length > 1 ? "s" : ""} ativa{emergencies.length > 1 ? "s" : ""}
+              </h3>
+            </div>
+            <Button
+              size="sm"
+              variant={showEmergencies ? "destructive" : "outline"}
+              onClick={() => setShowEmergencies(!showEmergencies)}
+              className="text-xs"
+            >
+              {showEmergencies ? "Ver todos" : `Ver emergências (${emergencies.length})`}
+            </Button>
+          </div>
+          {showEmergencies && (
+            <div className="mt-3 space-y-2">
+              {emergencies.map((ticket: any) => (
+                <div key={ticket.id} className="rounded-xl border-2 border-destructive/30 bg-destructive/10 p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="size-4 text-destructive shrink-0" />
+                        <p className="text-sm font-bold">{ticket.subject}</p>
+                        <span className="rounded-md bg-destructive/20 px-2 py-0.5 text-[10px] font-bold text-destructive uppercase">SOS</span>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{ticket.message}</p>
+                      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
+                        <span>Usuário: {ticket.user?.full_name ?? ticket.user_id.slice(0, 8)}</span>
+                        <span>{new Date(ticket.created_at).toLocaleString("pt-BR")}</span>
+                        {ticket.category && <span>Categoria: {ticket.category}</span>}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                        onClick={() => updateTicket.mutate({ ticket_id: ticket.id, status: "in_progress" })}
+                      >
+                        Assumir
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="h-7 text-xs"
+                        onClick={() => updateTicket.mutate({ ticket_id: ticket.id, status: "resolved" })}
+                      >
+                        Resolver
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Ticket list */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
           Tickets ({tickets?.length ?? 0})
@@ -1156,8 +1259,8 @@ function SupportSection() {
             <Button
               key={s}
               size="sm"
-              variant={statusFilter === s ? "default" : "outline"}
-              onClick={() => setStatusFilter(s)}
+              variant={!showEmergencies && statusFilter === s ? "default" : "outline"}
+              onClick={() => { setShowEmergencies(false); setStatusFilter(s); }}
               className="text-xs"
             >
               {s === "all" ? "Todos" : ticketStatusConfig[s]?.label ?? s}
@@ -1178,50 +1281,54 @@ function SupportSection() {
         </div>
       ) : (
         <div className="space-y-3">
-          {tickets.map((ticket: any) => (
-            <div key={ticket.id} className="rounded-xl border border-border bg-card p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-bold truncate">{ticket.subject}</p>
-                    <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-bold ${ticketStatusConfig[ticket.status]?.class}`}>
-                      {ticketStatusConfig[ticket.status]?.label ?? ticket.status}
-                    </span>
-                    <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-bold ${ticketPriorityConfig[ticket.priority]?.class}`}>
-                      {ticketPriorityConfig[ticket.priority]?.label ?? ticket.priority}
-                    </span>
+          {tickets.map((ticket: any) => {
+            const isUrgent = ticket.priority === "urgent" && ticket.status !== "resolved" && ticket.status !== "closed";
+            return (
+              <div key={ticket.id} className={`rounded-xl border p-4 ${isUrgent ? "border-destructive/30 bg-destructive/5" : "border-border bg-card"}`}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      {isUrgent && <AlertTriangle className="size-4 text-destructive shrink-0" />}
+                      <p className="text-sm font-bold truncate">{ticket.subject}</p>
+                      <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-bold ${ticketStatusConfig[ticket.status]?.class}`}>
+                        {ticketStatusConfig[ticket.status]?.label ?? ticket.status}
+                      </span>
+                      <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-bold ${ticketPriorityConfig[ticket.priority]?.class}`}>
+                        {ticketPriorityConfig[ticket.priority]?.label ?? ticket.priority}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{ticket.message}</p>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span>Usuário: {ticket.user?.full_name ?? ticket.user_id.slice(0, 8)}</span>
+                      <span>{new Date(ticket.created_at).toLocaleString("pt-BR")}</span>
+                      {ticket.category && <span>Categoria: {ticket.category}</span>}
+                      {ticket.resolved_at && <span>Resolvido em: {new Date(ticket.resolved_at).toLocaleString("pt-BR")}</span>}
+                    </div>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{ticket.message}</p>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                    <span>Usuário: {ticket.user?.full_name ?? ticket.user_id.slice(0, 8)}</span>
-                    <span>{new Date(ticket.created_at).toLocaleString("pt-BR")}</span>
-                    {ticket.category && <span>Categoria: {ticket.category}</span>}
-                    {ticket.resolved_at && <span>Resolvido em: {new Date(ticket.resolved_at).toLocaleString("pt-BR")}</span>}
+                  <div className="flex shrink-0 gap-1.5">
+                    <select
+                      value={ticket.status}
+                      onChange={(e) => updateTicket.mutate({ ticket_id: ticket.id, status: e.target.value })}
+                      className="rounded-md border border-border bg-background px-2 py-1 text-xs"
+                    >
+                      {Object.entries(ticketStatusConfig).map(([k, v]) => (
+                        <option key={k} value={k}>{v.label}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={ticket.priority}
+                      onChange={(e) => updateTicket.mutate({ ticket_id: ticket.id, priority: e.target.value })}
+                      className="rounded-md border border-border bg-background px-2 py-1 text-xs"
+                    >
+                      {Object.entries(ticketPriorityConfig).map(([k, v]) => (
+                        <option key={k} value={k}>{v.label}</option>
+                      ))}
+                    </select>
                   </div>
-                </div>
-                <div className="flex shrink-0 gap-1.5">
-                  <select
-                    value={ticket.status}
-                    onChange={(e) => updateTicket.mutate({ ticket_id: ticket.id, status: e.target.value })}
-                    className="rounded-md border border-border bg-background px-2 py-1 text-xs"
-                  >
-                    {Object.entries(ticketStatusConfig).map(([k, v]) => (
-                      <option key={k} value={k}>{v.label}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={ticket.priority}
-                    onChange={(e) => updateTicket.mutate({ ticket_id: ticket.id, priority: e.target.value })}
-                    className="rounded-md border border-border bg-background px-2 py-1 text-xs"
-                  >
-                    {Object.entries(ticketPriorityConfig).map(([k, v]) => (
-                      <option key={k} value={k}>{v.label}</option>
-                    ))}
-                  </select>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
