@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Car, MapPin, Navigation, Shield, Sparkles, Zap } from "lucide-react";
+import { AuthErrorBoundary } from "@/lib/error-boundary";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -12,7 +13,11 @@ export const Route = createFileRoute("/")({
       },
     ],
   }),
-  component: Landing,
+  component: () => (
+    <AuthErrorBoundary>
+      <Landing />
+    </AuthErrorBoundary>
+  ),
 });
 
 function Landing() {

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/Logo";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
+import { AuthErrorBoundary } from "@/lib/error-boundary";
 
 const search = z.object({
   mode: z.enum(["signin", "signup"]).optional(),
@@ -18,7 +19,11 @@ const search = z.object({
 export const Route = createFileRoute("/auth")({
   validateSearch: search,
   head: () => ({ meta: [{ title: "Entrar — RotaMais" }] }),
-  component: AuthPage,
+  component: () => (
+    <AuthErrorBoundary>
+      <AuthPage />
+    </AuthErrorBoundary>
+  ),
 });
 
 function AuthPage() {

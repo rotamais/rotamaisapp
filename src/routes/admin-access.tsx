@@ -7,10 +7,15 @@ import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/Logo";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
+import { AuthErrorBoundary } from "@/lib/error-boundary";
 
 export const Route = createFileRoute("/admin-access")({
   head: () => ({ meta: [{ title: "Admin — RotaMais" }] }),
-  component: AdminAccessPage,
+  component: () => (
+    <AuthErrorBoundary>
+      <AdminAccessPage />
+    </AuthErrorBoundary>
+  ),
 });
 
 function AdminAccessPage() {

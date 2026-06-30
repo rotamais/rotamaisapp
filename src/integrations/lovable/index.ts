@@ -2,7 +2,13 @@
 
 import { createLovableAuth } from "@lovable.dev/cloud-auth-js";
 import { supabase } from "../supabase/client";
-const lovableAuth = createLovableAuth();
+
+let lovableAuth: ReturnType<typeof createLovableAuth>;
+try {
+  lovableAuth = createLovableAuth();
+} catch {
+  lovableAuth = { signInWithOAuth: async () => ({ error: new Error("Lovable auth unavailable") }) } as any;
+}
 
 type SignInOptions = {
   redirect_uri?: string;
