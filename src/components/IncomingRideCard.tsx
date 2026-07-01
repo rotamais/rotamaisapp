@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
+import { createRealtimeChannel, removeRealtimeChannel } from "@/lib/supabase-realtime";
 import { listAvailableRidesForDriver } from "@/lib/driver.functions";
 import { acceptRide } from "@/lib/rotamais.functions";
 import { Button } from "@/components/ui/button";
@@ -87,9 +87,9 @@ export function IncomingRideCard({
       })
       .catch(() => {});
 
-    const ch = supabase
-      .channel("driver-incoming-rides")
-      .on(
+    const ch = createRealtimeChannel("driver-incoming-rides");
+    ch
+      ?.on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "rides", filter: "status=eq.requested" },
         async () => {
@@ -115,7 +115,7 @@ export function IncomingRideCard({
 
     return () => {
       active = false;
-      supabase.removeChannel(ch);
+      removeRealtimeChannel(ch);
     };
   }, [listFn, enabled, declined]);
 

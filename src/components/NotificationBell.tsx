@@ -8,7 +8,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { createRealtimeChannel, removeRealtimeChannel } from "@/lib/supabase-realtime";
 import {
   listNotifications,
   getUnreadCount,
@@ -54,8 +54,9 @@ export function NotificationBell() {
   });
 
   useEffect(() => {
-    const channel = supabase
-      .channel("notifications-realtime")
+    const channel = createRealtimeChannel("notifications-realtime");
+    if (!channel) return;
+    channel
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications" },
@@ -72,7 +73,9 @@ export function NotificationBell() {
         },
       )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      removeRealtimeChannel(channel);
+    };
   }, [qc]);
 
   return (
