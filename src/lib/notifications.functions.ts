@@ -4,7 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export const listNotifications = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const { data, error } = await (context.supabase as any)
       .from("notifications")
       .select("*")
       .eq("user_id", context.userId)
@@ -19,7 +19,7 @@ export const getUnreadCount = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data: session } = await context.supabase.auth.getSession();
     if (!session?.session?.user) return 0;
-    const { count, error } = await context.supabase
+    const { count, error } = await (context.supabase as any)
       .from("notifications")
       .select("*", { count: "exact", head: true })
       .eq("user_id", context.userId)
@@ -31,7 +31,7 @@ export const getUnreadCount = createServerFn({ method: "GET" })
 export const markNotificationRead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { error } = await context.supabase
+    const { error } = await (context.supabase as any)
       .from("notifications")
       .update({ read_at: new Date().toISOString() })
       .eq("user_id", context.userId)
