@@ -38,6 +38,10 @@ export const lovable = {
 
       try {
         await supabase.auth.setSession(result.tokens);
+        // Backup em localStorage próprio para não ser apagado pelo auto-refresh
+        try {
+          localStorage.setItem("rotamais-auth-tokens", JSON.stringify(result.tokens));
+        } catch {}
       } catch (e) {
         return { error: e instanceof Error ? e : new Error(String(e)) };
       }
