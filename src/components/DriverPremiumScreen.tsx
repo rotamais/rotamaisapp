@@ -101,16 +101,6 @@ function formatMin(value: number | null | undefined) {
   return value === null || value === undefined ? "—" : `${Math.round(value)} min`;
 }
 
-function formatElapsed(from: Date | null) {
-  if (!from) return "—";
-  const diff = Math.max(0, Date.now() - from.getTime());
-  const mins = Math.floor(diff / 60000);
-  const hours = Math.floor(mins / 60);
-  const rest = mins % 60;
-  if (hours > 0) return `${hours}h ${rest}m`;
-  return `${rest}m`;
-}
-
 function calculateDistanceKm(a: LatLng, b: LatLng) {
   const toRad = (x: number) => (x * Math.PI) / 180;
   const R = 6371;
@@ -305,6 +295,9 @@ function HeaderBar({
   onToggleOnline,
   toggling,
   canGoOnline,
+  onlineSince,
+  autoAccept,
+  onToggleAutoAccept,
 }: {
   profile?: { avatar_url?: string | null; full_name?: string | null } | null;
   isOnline: boolean;
@@ -312,6 +305,9 @@ function HeaderBar({
   onToggleOnline: () => void;
   toggling: boolean;
   canGoOnline: boolean;
+  onlineSince: Date | null;
+  autoAccept: boolean;
+  onToggleAutoAccept: () => void;
 }) {
   const initials = (profile?.full_name ?? "Motorista")
     .split(" ")
@@ -365,50 +361,15 @@ function HeaderBar({
           >
             <Bell className="size-5" />
           </button>
-          <DriverMenu />
+          <DriverMenu
+            onlineSince={onlineSince}
+            autoAccept={autoAccept}
+            onToggleAutoAccept={onToggleAutoAccept}
+            canGoOnline={canGoOnline}
+          />
         </div>
       </div>
     </header>
-  );
-}
-
-/* ===========================================================
- * Bottom Sheet: estados sem corrida (offline / online)
- * =========================================================== */
-function DriverControlPanel({
-  onlineSince,
-  autoAccept,
-  onToggleAutoAccept,
-  canGoOnline,
-}: {
-  onlineSince: Date | null;
-  autoAccept: boolean;
-  onToggleAutoAccept: () => void;
-  canGoOnline: boolean;
-}) {
-  return (
-    <div className="absolute left-4 top-[calc(env(safe-area-inset-top)+100px)] z-40 w-[calc(100%-2rem)] max-w-sm rounded-3xl bg-black/70 p-4 shadow-2xl ring-1 ring-white/10 backdrop-blur-md text-white sm:w-auto">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.22em] text-zinc-400">Tempo online</p>
-          <p className="mt-1 text-base font-bold">{formatElapsed(onlineSince)}</p>
-        </div>
-        <div className="rounded-2xl bg-amber-400 px-3 py-1 text-xs font-bold text-zinc-950">Hot Zones</div>
-      </div>
-      <div className="mt-4 flex flex-wrap items-center gap-3 text-xs">
-        <span className="rounded-full bg-white/10 px-3 py-1">3 zonas ativas</span>
-        <span className="rounded-full bg-white/10 px-3 py-1">Rota curta</span>
-        <button
-          onClick={onToggleAutoAccept}
-          disabled={!canGoOnline}
-          className={`rounded-full px-3 py-1 font-semibold transition ${
-            autoAccept ? "bg-emerald-500 text-black" : "bg-white/10 text-white"
-          } ${!canGoOnline ? "cursor-not-allowed opacity-60" : ""}`}
-        >
-          Auto Aceitar {autoAccept ? "ON" : "OFF"}
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -1258,12 +1219,9 @@ export function DriverPremiumScreen({
           onToggleOnline={toggleOnline}
           toggling={togglingOnline}
           canGoOnline={canGoOnline}
-        />
-        <DriverControlPanel
           onlineSince={onlineSince}
           autoAccept={autoAccept}
           onToggleAutoAccept={() => setAutoAccept((active) => !active)}
-          canGoOnline={canGoOnline}
         />
         <button
           type="button"

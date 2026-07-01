@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useNavigate } from "@tanstack/react-router";
@@ -12,8 +12,29 @@ import { DriverVehicleSettings } from "@/components/DriverVehicleSettings";
 import { DriverEarnings } from "@/components/DriverEarnings";
 import { Loader2, LogOut, Menu, User } from "lucide-react";
 
-export function DriverMenu() {
+function formatElapsed(from: Date | null) {
+  if (!from) return "—";
+  const diff = Math.max(0, Date.now() - from.getTime());
+  const mins = Math.floor(diff / 60000);
+  const hours = Math.floor(mins / 60);
+  const rest = mins % 60;
+  if (hours > 0) return `${hours}h ${rest}m`;
+  return `${rest}m`;
+}
+
+export function DriverMenu({
+  onlineSince,
+  autoAccept,
+  onToggleAutoAccept,
+  canGoOnline,
+}: {
+  onlineSince: Date | null;
+  autoAccept: boolean;
+  onToggleAutoAccept: () => void;
+  canGoOnline: boolean;
+}) {
   const [open, setOpen] = useState(false);
+  const [elapsed, setElapsed] = useState(() => formatElapsed(onlineSince));
   const stateFn = useServerFn(getDriverState);
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -23,6 +44,13 @@ export function DriverMenu() {
     queryFn: () => stateFn(),
     enabled: open,
   });
+
+  useEffect(() => {
+    setElapsed(formatElapsed(onlineSince));
+    if (!onlineSince) return;
+    const id = setInterval(() => setElapsed(formatElapsed(onlineSince)), 30_000);
+    return () => clearInterval(id);
+  }, [onlineSince]);
 
   async function signOut() {
     await qc.cancelQueries();
@@ -49,12 +77,37 @@ export function DriverMenu() {
         </SheetHeader>
 
         <div className="p-4">
-          <Tabs defaultValue="earnings" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+          <Tabs defaultValue="online" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="online">Online</TabsTrigger>
               <TabsTrigger value="earnings">Ganhos</TabsTrigger>
               <TabsTrigger value="docs">Documentos</TabsTrigger>
               <TabsTrigger value="vehicle">Veículo</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="online" className="mt-4">
+              <div className="space-y-4">
+                <div className="rounded-2xl bg-muted p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Tempo online</p>
+                  <p className="mt-1 text-2xl font-bold">{elapsed}</p>
+                </div>
+                <div className="flex items-center justify-between rounded-2xl bg-muted p-4">
+                  <div>
+                    <p className="text-sm font-semibold">Auto Aceitar</p>
+                    <p className="text-xs text-muted-foreground">Aceitar corridas automaticamente</p>
+                  </div>
+                  <button
+                    onClick={onToggleAutoAccept}
+                    disabled={!canGoOnline}
+                    className={`rounded-full px-4 py-2 text-xs font-bold transition ${
+                      autoAccept ? "bg-emerald-500 text-white" : "bg-zinc-700 text-zinc-300"
+                    } ${!canGoOnline ? "cursor-not-allowed opacity-60" : ""}`}
+                  >
+                    {autoAccept ? "Ativado" : "Desativado"}
+                  </button>
+                </div>
+              </div>
+            </TabsContent>
 
             <TabsContent value="earnings" className="mt-4">
               <DriverEarnings />
