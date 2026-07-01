@@ -23,7 +23,7 @@ import { DriverDocumentsManager } from "@/components/DriverDocumentsManager";
 import { RealMap, type LatLng } from "@/components/RealMap";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { createRealtimeChannel, removeRealtimeChannel } from "@/lib/supabase-realtime";
 import {
   getDriverCurrentRide,
   getDriverStats,
@@ -1078,9 +1078,9 @@ export function DriverPremiumScreen({
     };
     fetchList();
 
-    const ch = supabase
-      .channel("driver-incoming-rides")
-      .on(
+    const ch = createRealtimeChannel("driver-incoming-rides");
+    ch
+      ?.on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "rides", filter: "status=eq.requested" },
         () => fetchList(),
@@ -1095,23 +1095,23 @@ export function DriverPremiumScreen({
 
     return () => {
       active = false;
-      supabase.removeChannel(ch);
+      removeRealtimeChannel(ch);
     };
   }, [isOnline, canGoOnline, currentRide, incomingListFn]);
 
   /* ===== Realtime na corrida ativa ===== */
   useEffect(() => {
     if (!currentRide?.id) return;
-    const ch = supabase
-      .channel(`driver-ride-${currentRide.id}`)
-      .on(
+    const ch = createRealtimeChannel(`driver-ride-${currentRide.id}`);
+    ch
+      ?.on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "rides", filter: `id=eq.${currentRide.id}` },
         () => qc.invalidateQueries({ queryKey: ["driver-current-ride"] }),
       )
       .subscribe();
     return () => {
-      supabase.removeChannel(ch);
+      removeRealtimeChannel(ch);
     };
   }, [currentRide?.id, qc]);
 

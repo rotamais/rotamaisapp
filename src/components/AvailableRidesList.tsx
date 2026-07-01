@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
+import { createRealtimeChannel, removeRealtimeChannel } from "@/lib/supabase-realtime";
 import { listAvailableRides, acceptRide } from "@/lib/rotamais.functions";
 import { Button } from "@/components/ui/button";
 import { Loader2, MapPin } from "lucide-react";
@@ -29,9 +29,9 @@ export function AvailableRidesList({ onAccepted }: { onAccepted: (rideId: string
       .then((r) => active && setRides((r ?? []) as Ride[]))
       .finally(() => active && setLoading(false));
 
-    const ch = supabase
-      .channel("available-rides")
-      .on(
+    const ch = createRealtimeChannel("available-rides");
+    ch
+      ?.on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "rides", filter: "status=eq.requested" },
         (payload: any) => {
@@ -50,7 +50,7 @@ export function AvailableRidesList({ onAccepted }: { onAccepted: (rideId: string
 
     return () => {
       active = false;
-      supabase.removeChannel(ch);
+      removeRealtimeChannel(ch);
     };
   }, [listFn]);
 
