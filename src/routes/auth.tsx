@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
@@ -36,6 +36,27 @@ function AuthPage() {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Hidrata sessão do hash OAuth ao montar (#access_token=...) e redireciona
+  // caso já esteja autenticado (evita ficar preso em /auth após refresh).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!cancelled && data?.session) {
+          const dest = await routeByRole();
+          if (!cancelled) navigate({ to: dest, replace: true });
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function routeByRole() {
     const { data } = await supabase.auth.getUser();
@@ -90,16 +111,7 @@ function AuthPage() {
       const dest = await routeByRole();
       navigate({ to: dest, replace: true });
     } catch (err) {
-      // Fallback: try direct Supabase OAuth
-      try {
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: "google",
-          options: { redirectTo: window.location.origin + "/home" },
-        });
-        if (error) throw error;
-      } catch (err2) {
-        toast.error("Erro ao entrar com Google. Verifique se o OAuth está configurado no Supabase.");
-      }
+      toast.error(err instanceof Error ? err.message : "Erro ao entrar com Google.");
     } finally {
       setLoading(false);
     }

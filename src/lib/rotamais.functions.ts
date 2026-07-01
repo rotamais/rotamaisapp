@@ -21,7 +21,7 @@ const requestRideSchema = z.object({
 
 export const requestRide = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) => requestRideSchema.parse(data))
+  .inputValidator((data: unknown) => requestRideSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { data: ride, error } = await context.supabase
       .from("rides")
@@ -48,7 +48,7 @@ export const listAvailableRides = createServerFn({ method: "GET" })
 
 export const acceptRide = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) =>
+  .inputValidator((data: unknown) =>
     z.object({ ride_id: z.string().uuid(), vehicle_id: z.string().uuid().optional() }).parse(data),
   )
   .handler(async ({ data, context }) => {
@@ -71,7 +71,7 @@ export const acceptRide = createServerFn({ method: "POST" })
 
 export const updateRideStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) =>
+  .inputValidator((data: unknown) =>
     z
       .object({
         ride_id: z.string().uuid(),
@@ -118,7 +118,7 @@ export const getMyRides = createServerFn({ method: "GET" })
 
 export const updateDriverLocation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) =>
+  .inputValidator((data: unknown) =>
     z
       .object({
         lat: z.number(),
@@ -146,7 +146,7 @@ export const updateDriverLocation = createServerFn({ method: "POST" })
 
 export const createCarpool = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) =>
+  .inputValidator((data: unknown) =>
     z
       .object({
         vehicle_id: z.string().uuid().optional(),
@@ -194,7 +194,7 @@ export const searchCarpools = createServerFn({ method: "GET" })
 
 export const bookCarpool = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) =>
+  .inputValidator((data: unknown) =>
     z
       .object({
         carpool_id: z.string().uuid(),
@@ -217,7 +217,7 @@ export const bookCarpool = createServerFn({ method: "POST" })
 
 export const submitReview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) =>
+  .inputValidator((data: unknown) =>
     z
       .object({
         ride_id: z.string().uuid().optional(),
@@ -243,7 +243,7 @@ export const submitReview = createServerFn({ method: "POST" })
 
 export const sendMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) =>
+  .inputValidator((data: unknown) =>
     z
       .object({
         ride_id: z.string().uuid().optional(),
