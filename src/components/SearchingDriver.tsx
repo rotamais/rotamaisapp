@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { createRealtimeChannel, removeRealtimeChannel } from "@/lib/supabase-realtime";
 import { updateRideStatus } from "@/lib/rotamais.functions";
 import { Button } from "@/components/ui/button";
 import { Loader2, Star } from "lucide-react";
@@ -45,11 +46,11 @@ export function SearchingDriver({
         if (active && data) setRide(data as Ride);
       });
 
-    const ch = supabase
-      .channel(`ride-${rideId}`)
-      .on(
+    const ch = createRealtimeChannel(`ride-${rideId}`);
+    ch
+      ?.on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "rides", filter: "id=eq.${rideId}" },
+        { event: "UPDATE", schema: "public", table: "rides", filter: `id=eq.${rideId}` },
         (payload: any) => {
           setRide(payload.new as Ride);
         },
@@ -58,7 +59,7 @@ export function SearchingDriver({
 
     return () => {
       active = false;
-      supabase.removeChannel(ch);
+      removeRealtimeChannel(ch);
     };
   }, [rideId]);
 
