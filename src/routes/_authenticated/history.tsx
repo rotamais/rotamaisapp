@@ -30,7 +30,7 @@ function History() {
             </p>
           </div>
         )}
-        {data?.map((r) => (
+        {data?.map((r: any) => (
           <div key={r.id} className="rounded-2xl border border-border bg-card p-4">
             <div className="flex items-start justify-between">
               <div>

@@ -20,7 +20,7 @@ const onboardingSchema = z.object({
 
 export const submitDriverOnboarding = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: unknown) => onboardingSchema.parse(d))
+  .validator((d: any) => onboardingSchema.parse(d))
   .handler(async ({ context, data }) => {
     const sb = context.supabase;
     const plate = data.vehicle.plate.replace(/[\s-]/g, "").toUpperCase();
@@ -100,7 +100,7 @@ const DOC_TYPES = [
 
 export const registerDriverDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: unknown) =>
+  .validator((d: any) =>
     z
       .object({
         type: z.enum(DOC_TYPES),
@@ -118,7 +118,7 @@ export const registerDriverDocument = createServerFn({ method: "POST" })
         .select("id, storage_path")
         .eq("user_id", context.userId)
         .eq("type", data.type);
-      const paths = (old ?? []).map((d) => d.storage_path).filter(Boolean);
+      const paths = (old ?? []).map((d: any) => d.storage_path).filter(Boolean);
       if (paths.length) {
         await context.supabase.storage.from("documents").remove(paths);
         await context.supabase
@@ -126,7 +126,7 @@ export const registerDriverDocument = createServerFn({ method: "POST" })
           .delete()
           .in(
             "id",
-            (old ?? []).map((d) => d.id),
+            (old ?? []).map((d: any) => d.id),
           );
       }
     }
@@ -142,7 +142,7 @@ export const registerDriverDocument = createServerFn({ method: "POST" })
 
 export const getDriverDocumentUrls = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: unknown) => z.object({ paths: z.array(z.string().min(1)).max(50) }).parse(d))
+  .validator((d: any) => z.object({ paths: z.array(z.string().min(1)).max(50) }).parse(d))
   .handler(async ({ context, data }) => {
     if (!data.paths.length) return {} as Record<string, string>;
     const { data: signed, error } = await context.supabase.storage
@@ -158,7 +158,7 @@ export const getDriverDocumentUrls = createServerFn({ method: "POST" })
 
 export const updateDriverVehicle = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: unknown) =>
+  .validator((d: any) =>
     z
       .object({
         vehicle_id: z.string().uuid(),
@@ -297,7 +297,7 @@ export const getDriverCurrentRide = createServerFn({ method: "GET" })
 // a interface simples e usa apenas tabelas existentes.
 export const triggerDriverSOS = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: unknown) =>
+  .validator((d: any) =>
     z.object({ lat: z.number(), lng: z.number(), ride_id: z.string().uuid().optional() }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -311,7 +311,7 @@ export const triggerDriverSOS = createServerFn({ method: "POST" })
 // Ganhos detalhados do motorista por período (week | month | year)
 export const getDriverEarnings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: unknown) =>
+  .validator((d: any) =>
     z.object({ period: z.enum(["week", "month", "year"]).default("week") }).parse(d ?? {}),
   )
   .handler(async ({ context, data }) => {
@@ -335,10 +335,10 @@ export const getDriverEarnings = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     const list = rides ?? [];
-    const total = list.reduce((a, r: any) => a + Number(r.final_fare ?? 0), 0);
+    const total = list.reduce((a: number, r: any) => a + Number(r.final_fare ?? 0), 0);
     const count = list.length;
     const avg = count ? total / count : 0;
-    const distance = list.reduce((a, r: any) => a + Number(r.distance_km ?? 0), 0);
+    const distance = list.reduce((a: number, r: any) => a + Number(r.distance_km ?? 0), 0);
 
     // Buckets para o gráfico
     let bucketCount = 7;

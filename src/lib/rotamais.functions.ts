@@ -276,6 +276,6 @@ export const getMe = createServerFn({ method: "GET" })
     if (roles.error) throw new Error(roles.error.message);
     return {
       profile: profile.data,
-      roles: (roles.data ?? []).map((r) => r.role),
+      roles: (roles.data ?? []).map((r: any) => r.role),
     };
   });

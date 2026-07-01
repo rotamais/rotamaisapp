@@ -76,7 +76,7 @@ export function DriverOnboarding({
           },
         },
       });
-      setVehicleId(res.vehicle_id);
+      setVehicleId(res.vehicle_id ?? null);
       setStep(3);
     } catch (e: any) {
       const msg =
