@@ -120,7 +120,7 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Invalid token";
-      throw new Error(`Unauthorized: ${message}`);
+      throw new Error(message.startsWith("Unauthorized:") ? message : `Unauthorized: ${message}`);
     }
   },
 );
