@@ -115,28 +115,6 @@ function createSupabaseClient() {
 
 let _supabase: ReturnType<typeof createSupabaseClient> | undefined;
 
-// Fallback: lê o access_token diretamente do localStorage caso getSession() retorne null.
-// O Supabase armazena a sessão em chaves no formato "sb-<project_ref>-auth-token".
-export function getSupabaseSessionFromStorage(): string | undefined {
-  if (typeof window === "undefined") return;
-  try {
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const key = window.localStorage.key(i);
-      if (key?.startsWith("sb-") && key.endsWith("-auth-token")) {
-        const raw = window.localStorage.getItem(key);
-        if (!raw) continue;
-        const parsed = JSON.parse(raw);
-        const token = parsed?.access_token;
-        if (token && typeof token === "string") return token;
-      }
-    }
-  } catch {
-    // ignore
-  }
-}
-
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
 export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>, {
   get(_, prop, receiver) {
     if (!_supabase) _supabase = createSupabaseClient();
