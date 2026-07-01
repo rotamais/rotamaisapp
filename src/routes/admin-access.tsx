@@ -7,15 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/Logo";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { AuthErrorBoundary } from "@/lib/error-boundary";
 
 export const Route = createFileRoute("/admin-access")({
   head: () => ({ meta: [{ title: "Admin — RotaMais" }] }),
-  component: () => (
-    <AuthErrorBoundary>
-      <AdminAccessPage />
-    </AuthErrorBoundary>
-  ),
+  component: AdminAccessPage,
 });
 
 function AdminAccessPage() {
@@ -35,8 +30,9 @@ function AdminAccessPage() {
         throw new Error("Credenciais inválidas para acesso administrativo");
       }
       toast.success("Acesso administrador liberado");
-      navigate({ to: "/admin" });
+      navigate({ to: "/admin", replace: true });
     } catch (err) {
+      if ((err as any)?.code === "redirect") return;
       toast.error(err instanceof Error ? err.message : "Erro ao entrar");
     } finally {
       setLoading(false);

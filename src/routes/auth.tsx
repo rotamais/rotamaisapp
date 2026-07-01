@@ -37,6 +37,16 @@ function AuthPage() {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
 
+  async function routeByRole() {
+    const { data } = await supabase.auth.getUser();
+    if (!data?.user) return "/auth";
+    const email = data.user.email ?? "";
+    if (email === "rotamais@rotamais.app") return "/admin";
+    const meta = data.user.user_metadata;
+    if (meta?.account_type === "driver") return "/driver";
+    return "/home";
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -52,14 +62,17 @@ function AuthPage() {
         });
         if (error) throw error;
         toast.success("Conta criada! Verifique seu e-mail.");
-        navigate({ to: "/home" });
+        const dest = await routeByRole();
+        navigate({ to: dest, replace: true });
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success("Bem-vindo de volta!");
-        navigate({ to: "/home" });
+        const dest = await routeByRole();
+        navigate({ to: dest, replace: true });
       }
     } catch (err) {
+      if ((err as any)?.code === "redirect") return;
       toast.error(err instanceof Error ? err.message : "Erro ao autenticar");
     } finally {
       setLoading(false);
@@ -68,16 +81,28 @@ function AuthPage() {
 
   const handleGoogle = async () => {
     setLoading(true);
-    const res = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin + "/home",
-    });
-    if (res.error) {
-      toast.error("Erro ao entrar com Google");
+    try {
+      const res = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin + "/auth",
+      });
+      if (res.error) throw res.error;
+      if (res.redirected) return;
+      const dest = await routeByRole();
+      navigate({ to: dest, replace: true });
+    } catch (err) {
+      // Fallback: try direct Supabase OAuth
+      try {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: { redirectTo: window.location.origin + "/home" },
+        });
+        if (error) throw error;
+      } catch (err2) {
+        toast.error("Erro ao entrar com Google. Verifique se o OAuth está configurado no Supabase.");
+      }
+    } finally {
       setLoading(false);
-      return;
     }
-    if (res.redirected) return;
-    navigate({ to: "/home" });
   };
 
   return (
