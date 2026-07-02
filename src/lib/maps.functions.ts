@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
 
 function apiKey(): string {
   const key =
@@ -11,6 +13,7 @@ function apiKey(): string {
 }
 
 export const reverseGeocode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ lat: z.number(), lng: z.number() }).parse(d))
   .handler(async ({ data }) => {
     const key = apiKey();
@@ -26,7 +29,9 @@ export const reverseGeocode = createServerFn({ method: "POST" })
   });
 
 export const computeRoute = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
+
     z
       .object({
         origin: z.object({ lat: z.number(), lng: z.number() }),

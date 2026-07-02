@@ -230,6 +230,49 @@ export const submitReview = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data, context }) => {
+    // Verify caller actually participated in the ride/carpool before allowing a review
+    if (data.ride_id) {
+      const { data: ride, error: rErr } = await context.supabase
+        .from("rides")
+        .select("id, passenger_id, driver_id, status")
+        .eq("id", data.ride_id)
+        .maybeSingle();
+      if (rErr) throw new Error(rErr.message);
+      if (!ride) throw new Error("Corrida não encontrada");
+      const isParticipant =
+        ride.passenger_id === context.userId || ride.driver_id === context.userId;
+      if (!isParticipant) throw new Error("Você não participou desta corrida");
+      if (ride.status !== "completed")
+        throw new Error("Só é possível avaliar corridas concluídas");
+      const otherParty =
+        ride.passenger_id === context.userId ? ride.driver_id : ride.passenger_id;
+      if (data.reviewee_id !== otherParty)
+        throw new Error("Avaliação deve ser direcionada ao outro participante");
+    } else if (data.carpool_id) {
+      const { data: carpool, error: cErr } = await context.supabase
+        .from("carpools")
+        .select("id, driver_id")
+        .eq("id", data.carpool_id)
+        .maybeSingle();
+      if (cErr) throw new Error(cErr.message);
+      if (!carpool) throw new Error("Carona não encontrada");
+      const isDriver = carpool.driver_id === context.userId;
+      let isPassenger = false;
+      if (!isDriver) {
+        const { data: booking, error: bErr } = await context.supabase
+          .from("carpool_bookings")
+          .select("id, status")
+          .eq("carpool_id", data.carpool_id)
+          .eq("passenger_id", context.userId)
+          .eq("status", "confirmed")
+          .maybeSingle();
+        if (bErr) throw new Error(bErr.message);
+        isPassenger = Boolean(booking);
+      }
+      if (!isDriver && !isPassenger)
+        throw new Error("Você não participou desta carona");
+    }
+
     const { data: review, error } = await context.supabase
       .from("reviews")
       .insert({ ...data, reviewer_id: context.userId })
@@ -238,6 +281,7 @@ export const submitReview = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return review;
   });
+
 
 // ============ MESSAGES ============
 
