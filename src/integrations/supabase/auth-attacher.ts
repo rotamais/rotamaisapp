@@ -54,7 +54,7 @@ export const attachSupabaseAuth = createMiddleware({ type: "function" }).client(
     }
 
     if (!token) {
-      token = readAccessToken();
+      token = readAccessToken() ?? undefined;
     }
 
     if (token) {
