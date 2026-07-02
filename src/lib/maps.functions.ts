@@ -13,6 +13,7 @@ function apiKey(): string {
 }
 
 export const reverseGeocode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ lat: z.number(), lng: z.number() }).parse(d))
   .handler(async ({ data }) => {
     const key = apiKey();
