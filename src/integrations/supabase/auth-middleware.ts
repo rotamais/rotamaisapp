@@ -7,7 +7,11 @@ import { getSupabaseEnv } from "./env";
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
-    return JSON.parse(atob(token.split(".")[1]));
+    const encoded = token.split(".")[1];
+    if (!encoded) return null;
+    const base64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+    return JSON.parse(atob(padded));
   } catch {
     return null;
   }
@@ -103,8 +107,7 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
           throw new Error("Unauthorized: Invalid token");
         }
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+        const { data: userData, error: userError } = await supabase.auth.getUser(token);
         if (userError || !userData?.user) {
           throw new Error("Unauthorized: Invalid token");
         }
