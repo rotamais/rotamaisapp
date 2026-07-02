@@ -42,6 +42,16 @@ function readAccessToken(): string | null {
   return null;
 }
 
+function isExpiredOrExpiring(token: string, skewSeconds = 60): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    if (!payload?.exp) return true;
+    return payload.exp * 1000 - Date.now() < skewSeconds * 1000;
+  } catch {
+    return true;
+  }
+}
+
 export const attachSupabaseAuth = createMiddleware({ type: "function" }).client(
   async ({ next }) => {
     let token: string | undefined;
@@ -57,17 +67,18 @@ export const attachSupabaseAuth = createMiddleware({ type: "function" }).client(
       token = readAccessToken() ?? undefined;
     }
 
-    if (token) {
+    // Proactively refresh if expired / about to expire
+    if (token && isExpiredOrExpiring(token)) {
       try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        if (payload.exp && payload.exp * 1000 < Date.now()) {
-          const refreshed = await supabase.auth.refreshSession();
-          if (refreshed.data?.session?.access_token) {
-            token = refreshed.data.session.access_token;
-          }
+        const refreshed = await supabase.auth.refreshSession();
+        const newToken = refreshed.data?.session?.access_token;
+        if (newToken && !isExpiredOrExpiring(newToken, 0)) {
+          token = newToken;
+        } else {
+          token = undefined; // don't send stale token
         }
       } catch {
-        /* keep existing token even if expired */
+        token = undefined;
       }
     }
 

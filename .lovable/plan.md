@@ -1,35 +1,39 @@
-## Diagnóstico
+## Causa
 
-O arquivo `.env` já contém todas as variáveis que você listou (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID`). No Lovable Cloud, o `.env` é gerenciado automaticamente — inserir/alterar valores lá não resolveria e ainda pode ser sobrescrito. A `SUPABASE_SERVICE_ROLE_KEY` fica exclusivamente como secret do backend (não vai no `.env` do repositório) e já está configurada.
+O erro `Unauthorized: Invalid token` vem do middleware do servidor (`src/integrations/supabase/auth-middleware.ts`), que rejeita o Bearer enviado pela chamada `submitDriverOnboarding`. Investigando o fluxo:
 
-O login em si está funcionando (logs de auth mostram Google OIDC `status 200` para o seu usuário). O problema "refresh desloga" está no código de autenticação:
+1. `src/integrations/supabase/client.ts` está criando o cliente com `autoRefreshToken: false`. Como o access token do Supabase expira em ~1h, qualquer sessão parada por mais que isso guarda um token vencido no `localStorage`.
+2. `src/integrations/supabase/auth-attacher.ts` (o middleware que anexa o `Authorization`) pega o token via `supabase.auth.getSession()` — que, com `autoRefreshToken: false`, devolve o token vencido sem tentar renovar. Ele só tenta `refreshSession()` num `try/catch` interno onde a expiração é decodificada, mas basta um erro silencioso ali para o token vencido seguir para o servidor.
+3. No servidor, `getClaims(token)` + fallback `supabaseAdmin.auth.getUser(token)` falham e o middleware lança `Unauthorized: Invalid token`. Como o botão "Salvar" faz a chamada só depois de o usuário passar tempo preenchendo o formulário, é o caminho mais fácil de o token expirar antes do submit.
 
-1. **OAuth Google**: após o Google redirecionar de volta para `/auth`, a URL contém os tokens no hash. Mas o cliente Supabase usa um `Proxy` que só instancia na primeira chamada a `supabase.auth.*`. Na página `/auth` recém-carregada nenhum código toca `supabase.auth` no mount, então o `detectSessionInUrl` do Supabase nunca roda — o hash é descartado sem gravar sessão no `localStorage`. No próximo refresh não há sessão.
-2. **Falta um `onAuthStateChange` no root**: sem ele, quando o Supabase termina de hidratar tokens (assíncrono), o Router não é invalidado e o `beforeLoad` de `_authenticated` pode rodar antes da sessão existir → redirect para `/auth`.
-3. **`handleGoogle` tem um fallback para `supabase.auth.signInWithOAuth` direto** que fere as regras do Lovable Cloud (deve usar só o broker `lovable.auth`) e mascara erros reais.
+Esse mesmo problema explica o sintoma anterior de "refresh me desloga": sem auto-refresh, qualquer aba aberta por mais de 1h perde a sessão.
 
 ## Correções
 
-### 1. `src/routes/auth.tsx`
-- No mount da página, forçar a hidratação de sessão do hash chamando `supabase.auth.getSession()` dentro de um `useEffect`. Se a sessão existir logo depois, navegar para o destino do usuário (`routeByRole()`).
-- Remover o fallback direto `supabase.auth.signInWithOAuth("google", …)` do `handleGoogle` (deixar só o `lovable.auth`).
-- Mudar o `redirect_uri` para `window.location.origin` (raiz), mantendo apenas o helper pra decidir destino no `onAuthStateChange`.
+### 1. `src/integrations/supabase/client.ts`
+Ligar `autoRefreshToken: true` na criação do cliente real (mantendo o fallback local intacto). O arquivo tem cabeçalho de "auto-gerado" mas já foi customizado com `createFallbackClient`, então esta linha específica é ajuste local seguro.
 
-### 2. `src/routes/__root.tsx`
-- Adicionar (dentro de `RootComponent`) um `useEffect` client-only registrando `supabase.auth.onAuthStateChange`, filtrando `SIGNED_IN` / `SIGNED_OUT` / `USER_UPDATED` e chamando `router.invalidate()` + `queryClient.invalidateQueries()` (mas não em `SIGNED_OUT`, para não gerar 401 storm).
-- Isso garante que, assim que o Supabase termina de processar o hash OAuth ou o `signInWithPassword`, a árvore de rotas re-avalia o `beforeLoad` do `_authenticated` com sessão válida.
+```ts
+return createClient<Database>(url, publishableKey, {
+  auth: {
+    storage: typeof window !== "undefined" ? localStorage : undefined,
+    persistSession: true,
+    autoRefreshToken: true, // era false — causa do token vencido
+  },
+});
+```
 
-### 3. `src/integrations/supabase/client.ts` (arquivo auto-gerado — só tocar se necessário)
-- Não vou editar. Já usa `persistSession: true` + `localStorage` e cai no fallback só quando as VITE_ vars estão ausentes (não é o caso).
+### 2. `src/integrations/supabase/auth-attacher.ts`
+Reforçar para nunca mandar um token vencido:
 
-### 4. `.env`
-- **Não alterar.** O Lovable Cloud regenera esse arquivo; suas 6 variáveis já estão lá. A `SUPABASE_SERVICE_ROLE_KEY` fica só como secret do backend e não é exibida no editor por segurança.
+- Antes de anexar, se o token decodificado tem `exp` faltando OU expira em menos de 60 s, chamar `supabase.auth.refreshSession()` e usar o novo `access_token`.
+- Se a renovação falhar OU se, após tudo, o token continuar vencido, **não** enviar o header `Authorization` (em vez de mandar um Bearer inválido). Assim o servidor devolve 401 limpo e a UI pode reagir pedindo novo login, em vez do erro genérico "Invalid token".
+- Manter o fallback `readAccessToken()` apenas como último recurso, e aplicar a mesma checagem de expiração antes de anexar.
 
-## Verificação
+### 3. Verificação
+- Reproduzir com Playwright: logar, esperar >1h de sessão simulando expiração via `localStorage`, tentar salvar o cadastro de motorista e confirmar que:
+  - o attacher renova o token, e
+  - o servidor aceita e devolve 200 (motorista salvo, vai para o passo de documentos).
+- Se a renovação falhar, verificar que a UI mostra "Sessão expirada" em vez de "Invalid token".
 
-Após implementar:
-1. Rodar Playwright contra `http://localhost:8080/auth`, logar com email/senha de teste, dar refresh na `/home` e confirmar que a sessão persiste.
-2. Screenshot da tela após refresh mostrando o usuário ainda logado.
-3. Rever logs do console para garantir que não há loop de `onAuthStateChange`.
-
-Depois do OK, publicar novamente para propagar em `rotamaisapp.lovable.app`.
+Sem esse fix, qualquer chamada autenticada continuará quebrando após ~1h de sessão inativa, não só o "Salvar tipo de carro".
