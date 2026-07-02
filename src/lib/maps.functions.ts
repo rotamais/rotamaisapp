@@ -29,7 +29,9 @@ export const reverseGeocode = createServerFn({ method: "POST" })
   });
 
 export const computeRoute = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
+
     z
       .object({
         origin: z.object({ lat: z.number(), lng: z.number() }),
