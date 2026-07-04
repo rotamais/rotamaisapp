@@ -22,8 +22,8 @@ export default defineTool({
     const supabase = supabaseForUser(ctx);
     const uid = ctx.getUserId();
     const [{ data: driver, error: dErr }, { data: vehicles, error: vErr }] = await Promise.all([
-      supabase.from("drivers").select("*").eq("user_id", uid).maybeSingle(),
-      supabase.from("vehicles").select("*").eq("user_id", uid),
+      supabase.from("drivers").select("*").eq("id", uid).maybeSingle(),
+      supabase.from("vehicles").select("*").eq("driver_id", uid),
     ]);
     const error = dErr ?? vErr;
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
