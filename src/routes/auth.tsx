@@ -14,7 +14,15 @@ import { AuthErrorBoundary } from "@/lib/error-boundary";
 const search = z.object({
   mode: z.enum(["signin", "signup"]).optional(),
   role: z.enum(["passenger", "driver"]).optional(),
+  next: z.string().optional(),
 });
+
+function safeNext(next?: string): string | null {
+  if (!next) return null;
+  // Only accept same-origin relative paths.
+  if (!next.startsWith("/") || next.startsWith("//")) return null;
+  return next;
+}
 
 export const Route = createFileRoute("/auth")({
   validateSearch: search,
@@ -27,7 +35,8 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
-  const { mode = "signin", role = "passenger" } = Route.useSearch();
+  const { mode = "signin", role = "passenger", next } = Route.useSearch();
+  const nextPath = safeNext(next);
   const navigate = useNavigate();
   const [tab, setTab] = useState<"signin" | "signup">(mode);
   const [accountType, setAccountType] = useState<"passenger" | "driver">(role);
