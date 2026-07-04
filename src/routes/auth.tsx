@@ -14,7 +14,15 @@ import { AuthErrorBoundary } from "@/lib/error-boundary";
 const search = z.object({
   mode: z.enum(["signin", "signup"]).optional(),
   role: z.enum(["passenger", "driver"]).optional(),
+  next: z.string().optional(),
 });
+
+function safeNext(next?: string): string | null {
+  if (!next) return null;
+  // Only accept same-origin relative paths.
+  if (!next.startsWith("/") || next.startsWith("//")) return null;
+  return next;
+}
 
 export const Route = createFileRoute("/auth")({
   validateSearch: search,
@@ -27,7 +35,8 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
-  const { mode = "signin", role = "passenger" } = Route.useSearch();
+  const { mode = "signin", role = "passenger", next } = Route.useSearch();
+  const nextPath = safeNext(next);
   const navigate = useNavigate();
   const [tab, setTab] = useState<"signin" | "signup">(mode);
   const [accountType, setAccountType] = useState<"passenger" | "driver">(role);
@@ -45,8 +54,7 @@ function AuthPage() {
       try {
         const { data } = await supabase.auth.getSession();
         if (!cancelled && data?.session) {
-          const dest = await routeByRole();
-          if (!cancelled) navigate({ to: dest, replace: true });
+          await redirectAfterAuth();
         }
       } catch {
         /* ignore */
@@ -68,6 +76,15 @@ function AuthPage() {
     return "/home";
   }
 
+  async function redirectAfterAuth() {
+    if (nextPath) {
+      window.location.href = nextPath;
+      return;
+    }
+    const dest = await routeByRole();
+    navigate({ to: dest, replace: true });
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -77,20 +94,19 @@ function AuthPage() {
           email,
           password,
           options: {
-            emailRedirectTo: window.location.origin + "/home",
+            emailRedirectTo:
+              window.location.origin + (nextPath ?? "/home"),
             data: { full_name: fullName, phone, account_type: accountType },
           },
         });
         if (error) throw error;
         toast.success("Conta criada! Verifique seu e-mail.");
-        const dest = await routeByRole();
-        navigate({ to: dest, replace: true });
+        await redirectAfterAuth();
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success("Bem-vindo de volta!");
-        const dest = await routeByRole();
-        navigate({ to: dest, replace: true });
+        await redirectAfterAuth();
       }
     } catch (err) {
       if ((err as any)?.code === "redirect") return;
@@ -103,13 +119,16 @@ function AuthPage() {
   const handleGoogle = async () => {
     setLoading(true);
     try {
+      const redirectBack =
+        window.location.origin +
+        "/auth" +
+        (nextPath ? `?next=${encodeURIComponent(nextPath)}` : "");
       const res = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin + "/auth",
+        redirect_uri: redirectBack,
       });
       if (res.error) throw res.error;
       if (res.redirected) return;
-      const dest = await routeByRole();
-      navigate({ to: dest, replace: true });
+      await redirectAfterAuth();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao entrar com Google.");
     } finally {
