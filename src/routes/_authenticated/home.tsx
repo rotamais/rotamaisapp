@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { RealMap, type LatLng } from "@/components/RealMap";
 import { VehicleCategoryPicker } from "@/components/VehicleCategoryPicker";
 import { SearchingDriver } from "@/components/SearchingDriver";
@@ -10,7 +10,7 @@ import { Briefcase, Heart, Home as HomeIcon, Loader2, MapPin, Menu, Search } fro
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { requestRide } from "@/lib/rotamais.functions";
-import { computeRoute, reverseGeocode } from "@/lib/maps.functions";
+import { computeRoute, reverseGeocode, searchAddress } from "@/lib/maps.functions";
 import { listSavedPlaces } from "@/lib/places.functions";
 import type { VehicleCategory } from "@/lib/pricing";
 import { toast } from "sonner";
@@ -20,7 +20,14 @@ export const Route = createFileRoute("/_authenticated/home")({
 });
 
 type Stage = "idle" | "destination" | "select" | "searching";
-type Suggestion = { placeId: string; primary: string; secondary: string };
+type Suggestion = {
+  placeId: string;
+  primary: string;
+  secondary: string;
+  address: string;
+  lat: number;
+  lng: number;
+};
 
 function PassengerHome() {
   const [stage, setStage] = useState<Stage>("idle");
@@ -32,7 +39,7 @@ function PassengerHome() {
   const [route, setRoute] = useState<{
     distance_km: number;
     duration_min: number;
-    polyline?: string;
+    coords?: [number, number][];
   } | null>(null);
   const [routing, setRouting] = useState(false);
   const [category, setCategory] = useState<VehicleCategory | null>(null);
@@ -44,14 +51,12 @@ function PassengerHome() {
   const reverseFn = useServerFn(reverseGeocode);
   const routeFn = useServerFn(computeRoute);
   const placesFn = useServerFn(listSavedPlaces);
+  const searchFn = useServerFn(searchAddress);
 
   const { data: savedPlaces } = useQuery({
     queryKey: ["saved-places"],
     queryFn: () => placesFn(),
   });
-
-  const sessionTokenRef = useRef<any>(null);
-  const placesReadyRef = useRef(false);
 
   // Pega localização atual no mount
   useEffect(() => {
