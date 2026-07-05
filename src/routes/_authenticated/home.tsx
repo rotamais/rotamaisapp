@@ -181,7 +181,7 @@ function PassengerHome() {
           center={originLL ?? undefined}
           origin={originLL ?? undefined}
           destination={destLL ?? undefined}
-          polyline={route?.polyline}
+          routeCoords={route?.coords}
         />
         <header className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-4 pt-[env(safe-area-inset-top)]">
           <button className="pointer-events-auto grid size-10 place-items-center rounded-full bg-background shadow-[var(--shadow-soft)]">
