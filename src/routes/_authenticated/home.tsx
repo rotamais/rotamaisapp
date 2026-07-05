@@ -91,14 +91,7 @@ function PassengerHome() {
     );
   }
 
-  async function ensurePlaces() {
-    if (placesReadyRef.current) return;
-    const g = (window as any).google;
-    if (!g?.maps) return;
-    const { AutocompleteSessionToken } = await g.maps.importLibrary("places");
-    sessionTokenRef.current = new AutocompleteSessionToken();
-    placesReadyRef.current = true;
-  }
+  let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   async function onDestinationChange(v: string) {
     setDestination(v);
@@ -108,45 +101,24 @@ function PassengerHome() {
       setSuggestions([]);
       return;
     }
-    await ensurePlaces();
-    const g = (window as any).google;
-    if (!g?.maps) return;
-    try {
-      const { AutocompleteSuggestion } = await g.maps.importLibrary("places");
-      const { suggestions: sugs } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
-        input: v,
-        sessionToken: sessionTokenRef.current,
-        language: "pt-BR",
-        region: "br",
-        locationBias: originLL ? { center: originLL, radius: 30000 } : undefined,
-      });
-      setSuggestions(
-        (sugs ?? [])
-          .filter((s: any) => s.placePrediction)
-          .slice(0, 5)
-          .map((s: any) => ({
-            placeId: s.placePrediction.placeId,
-            primary: s.placePrediction.mainText?.text ?? s.placePrediction.text?.text ?? "",
-            secondary: s.placePrediction.secondaryText?.text ?? "",
-          })),
-      );
-    } catch (e) {
-      console.warn(e);
-    }
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(async () => {
+      try {
+        const results = await searchFn({
+          data: { query: v, near: originLL ?? undefined },
+        });
+        setSuggestions(results);
+      } catch (e) {
+        console.warn(e);
+      }
+    }, 300);
   }
 
   async function pickSuggestion(s: Suggestion) {
-    setDestination(`${s.primary}${s.secondary ? `, ${s.secondary}` : ""}`);
+    setDestination(s.address);
     setSuggestions([]);
-    const g = (window as any).google;
-    const { Place } = await g.maps.importLibrary("places");
-    const place = new Place({ id: s.placeId, requestedLanguage: "pt-BR" });
-    await place.fetchFields({ fields: ["location", "formattedAddress"] });
-    const loc = place.location;
-    const ll = { lat: loc.lat(), lng: loc.lng() };
+    const ll = { lat: s.lat, lng: s.lng };
     setDestLL(ll);
-    sessionTokenRef.current = null;
-    placesReadyRef.current = false;
 
     if (!originLL) {
       toast.error("Sem localização de origem");
@@ -163,6 +135,7 @@ function PassengerHome() {
       setRouting(false);
     }
   }
+
 
   async function handleRequest() {
     if (!originLL || !destLL || !route || !category) return;
