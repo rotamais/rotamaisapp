@@ -2,34 +2,25 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/google_maps";
+// Free providers — no API key required.
+// Geocoding: Nominatim (OpenStreetMap)
+// Routing:   OSRM public demo server
+// Please respect fair-use policies of these public services.
 
-function gatewayHeaders(extra: Record<string, string> = {}) {
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  const connectionKey = process.env.GOOGLE_MAPS_API_KEY;
-  if (!lovableKey || !connectionKey) {
-    throw new Error("Google Maps connector não configurado");
-  }
-  return {
-    Authorization: `Bearer ${lovableKey}`,
-    "X-Connection-Api-Key": connectionKey,
-    ...extra,
-  };
-}
+const NOMINATIM = "https://nominatim.openstreetmap.org";
+const OSRM = "https://router.project-osrm.org";
+const UA = "RotaMaisApp/1.0 (contact@rotamais.app)";
 
 export const reverseGeocode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ lat: z.number(), lng: z.number() }).parse(d))
   .handler(async ({ data }) => {
-    const url = `${GATEWAY_URL}/maps/api/geocode/json?latlng=${data.lat},${data.lng}&language=pt-BR`;
-    const res = await fetch(url, { headers: gatewayHeaders() });
-    const json = await res.json();
-    if (!res.ok || json.status !== "OK") {
-      throw new Error(`Geocoding ${res.status}: ${json.status ?? "erro"}`);
-    }
-    const first = json.results?.[0];
+    const url = `${NOMINATIM}/reverse?format=jsonv2&lat=${data.lat}&lon=${data.lng}&accept-language=pt-BR`;
+    const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" } });
+    if (!res.ok) throw new Error(`Reverse geocoding ${res.status}`);
+    const json = (await res.json()) as { display_name?: string };
     return {
-      address: first?.formatted_address ?? `${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}`,
+      address: json.display_name ?? `${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}`,
     };
   });
 
@@ -37,21 +28,73 @@ export const geocodeAddress = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ address: z.string().min(3).max(300) }).parse(d))
   .handler(async ({ data }) => {
-    const url = `${GATEWAY_URL}/maps/api/geocode/json?address=${encodeURIComponent(
+    const url = `${NOMINATIM}/search?format=jsonv2&q=${encodeURIComponent(
       data.address,
-    )}&language=pt-BR&region=br`;
-    const res = await fetch(url, { headers: gatewayHeaders() });
-    const json = await res.json();
-    if (!res.ok || json.status !== "OK") {
-      throw new Error(`Geocoding ${res.status}: ${json.status ?? "erro"}`);
-    }
-    const first = json.results?.[0];
-    if (!first?.geometry?.location) throw new Error("Endereço não encontrado");
+    )}&limit=1&accept-language=pt-BR&countrycodes=br`;
+    const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" } });
+    if (!res.ok) throw new Error(`Geocoding ${res.status}`);
+    const arr = (await res.json()) as Array<{
+      display_name: string;
+      lat: string;
+      lon: string;
+    }>;
+    const first = arr[0];
+    if (!first) throw new Error("Endereço não encontrado");
     return {
-      address: first.formatted_address as string,
-      lat: first.geometry.location.lat as number,
-      lng: first.geometry.location.lng as number,
+      address: first.display_name,
+      lat: Number(first.lat),
+      lng: Number(first.lon),
     };
+  });
+
+export const searchAddress = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        query: z.string().min(3).max(200),
+        near: z.object({ lat: z.number(), lng: z.number() }).optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) => {
+    const params = new URLSearchParams({
+      format: "jsonv2",
+      q: data.query,
+      limit: "5",
+      "accept-language": "pt-BR",
+      countrycodes: "br",
+      addressdetails: "1",
+    });
+    if (data.near) {
+      // ~50km bias box
+      const d = 0.5;
+      const { lat, lng } = data.near;
+      params.set("viewbox", `${lng - d},${lat + d},${lng + d},${lat - d}`);
+      params.set("bounded", "0");
+    }
+    const res = await fetch(`${NOMINATIM}/search?${params.toString()}`, {
+      headers: { "User-Agent": UA, Accept: "application/json" },
+    });
+    if (!res.ok) throw new Error(`Search ${res.status}`);
+    const arr = (await res.json()) as Array<{
+      place_id: number;
+      display_name: string;
+      lat: string;
+      lon: string;
+      name?: string;
+    }>;
+    return arr.map((r) => {
+      const parts = r.display_name.split(",");
+      return {
+        placeId: String(r.place_id),
+        primary: r.name || parts[0]?.trim() || r.display_name,
+        secondary: parts.slice(1, 4).join(", ").trim(),
+        address: r.display_name,
+        lat: Number(r.lat),
+        lng: Number(r.lon),
+      };
+    });
   });
 
 export const computeRoute = createServerFn({ method: "POST" })
@@ -65,34 +108,30 @@ export const computeRoute = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data }) => {
-    const url = `${GATEWAY_URL}/routes/directions/v2:computeRoutes`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: gatewayHeaders({
-        "Content-Type": "application/json",
-        "X-Goog-FieldMask":
-          "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline",
-      }),
-      body: JSON.stringify({
-        origin: { location: { latLng: { latitude: data.origin.lat, longitude: data.origin.lng } } },
-        destination: {
-          location: { latLng: { latitude: data.destination.lat, longitude: data.destination.lng } },
-        },
-        travelMode: "DRIVE",
-        routingPreference: "TRAFFIC_AWARE",
-        languageCode: "pt-BR",
-        regionCode: "BR",
-        units: "METRIC",
-      }),
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error(`Routes ${res.status}: ${json.error?.message ?? "erro"}`);
-    const route = json.routes?.[0];
-    if (!route) throw new Error("Sem rotas");
-    const durationSec = Number(String(route.duration ?? "0s").replace(/s$/, "")) || 0;
+    const { origin, destination } = data;
+    const url =
+      `${OSRM}/route/v1/driving/` +
+      `${origin.lng},${origin.lat};${destination.lng},${destination.lat}` +
+      `?overview=full&geometries=geojson&steps=false`;
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    const json = (await res.json()) as {
+      code: string;
+      routes?: Array<{
+        distance: number;
+        duration: number;
+        geometry: { coordinates: [number, number][] };
+      }>;
+      message?: string;
+    };
+    if (!res.ok || json.code !== "Ok" || !json.routes?.[0]) {
+      throw new Error(`Routes ${res.status}: ${json.message ?? json.code ?? "erro"}`);
+    }
+    const route = json.routes[0];
+    // GeoJSON is [lng, lat]; convert to [lat, lng]
+    const coords: [number, number][] = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
     return {
-      distance_km: (route.distanceMeters ?? 0) / 1000,
-      duration_min: Math.max(1, Math.round(durationSec / 60)),
-      polyline: route.polyline?.encodedPolyline as string | undefined,
+      distance_km: route.distance / 1000,
+      duration_min: Math.max(1, Math.round(route.duration / 60)),
+      coords,
     };
   });

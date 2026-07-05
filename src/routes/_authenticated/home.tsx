@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { RealMap, type LatLng } from "@/components/RealMap";
 import { VehicleCategoryPicker } from "@/components/VehicleCategoryPicker";
 import { SearchingDriver } from "@/components/SearchingDriver";
@@ -10,7 +10,7 @@ import { Briefcase, Heart, Home as HomeIcon, Loader2, MapPin, Menu, Search } fro
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { requestRide } from "@/lib/rotamais.functions";
-import { computeRoute, reverseGeocode } from "@/lib/maps.functions";
+import { computeRoute, reverseGeocode, searchAddress } from "@/lib/maps.functions";
 import { listSavedPlaces } from "@/lib/places.functions";
 import type { VehicleCategory } from "@/lib/pricing";
 import { toast } from "sonner";
@@ -20,7 +20,14 @@ export const Route = createFileRoute("/_authenticated/home")({
 });
 
 type Stage = "idle" | "destination" | "select" | "searching";
-type Suggestion = { placeId: string; primary: string; secondary: string };
+type Suggestion = {
+  placeId: string;
+  primary: string;
+  secondary: string;
+  address: string;
+  lat: number;
+  lng: number;
+};
 
 function PassengerHome() {
   const [stage, setStage] = useState<Stage>("idle");
@@ -32,7 +39,7 @@ function PassengerHome() {
   const [route, setRoute] = useState<{
     distance_km: number;
     duration_min: number;
-    polyline?: string;
+    coords?: [number, number][];
   } | null>(null);
   const [routing, setRouting] = useState(false);
   const [category, setCategory] = useState<VehicleCategory | null>(null);
@@ -44,14 +51,12 @@ function PassengerHome() {
   const reverseFn = useServerFn(reverseGeocode);
   const routeFn = useServerFn(computeRoute);
   const placesFn = useServerFn(listSavedPlaces);
+  const searchFn = useServerFn(searchAddress);
 
   const { data: savedPlaces } = useQuery({
     queryKey: ["saved-places"],
     queryFn: () => placesFn(),
   });
-
-  const sessionTokenRef = useRef<any>(null);
-  const placesReadyRef = useRef(false);
 
   // Pega localização atual no mount
   useEffect(() => {
@@ -86,14 +91,7 @@ function PassengerHome() {
     );
   }
 
-  async function ensurePlaces() {
-    if (placesReadyRef.current) return;
-    const g = (window as any).google;
-    if (!g?.maps) return;
-    const { AutocompleteSessionToken } = await g.maps.importLibrary("places");
-    sessionTokenRef.current = new AutocompleteSessionToken();
-    placesReadyRef.current = true;
-  }
+  let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   async function onDestinationChange(v: string) {
     setDestination(v);
@@ -103,45 +101,24 @@ function PassengerHome() {
       setSuggestions([]);
       return;
     }
-    await ensurePlaces();
-    const g = (window as any).google;
-    if (!g?.maps) return;
-    try {
-      const { AutocompleteSuggestion } = await g.maps.importLibrary("places");
-      const { suggestions: sugs } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
-        input: v,
-        sessionToken: sessionTokenRef.current,
-        language: "pt-BR",
-        region: "br",
-        locationBias: originLL ? { center: originLL, radius: 30000 } : undefined,
-      });
-      setSuggestions(
-        (sugs ?? [])
-          .filter((s: any) => s.placePrediction)
-          .slice(0, 5)
-          .map((s: any) => ({
-            placeId: s.placePrediction.placeId,
-            primary: s.placePrediction.mainText?.text ?? s.placePrediction.text?.text ?? "",
-            secondary: s.placePrediction.secondaryText?.text ?? "",
-          })),
-      );
-    } catch (e) {
-      console.warn(e);
-    }
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(async () => {
+      try {
+        const results = await searchFn({
+          data: { query: v, near: originLL ?? undefined },
+        });
+        setSuggestions(results);
+      } catch (e) {
+        console.warn(e);
+      }
+    }, 300);
   }
 
   async function pickSuggestion(s: Suggestion) {
-    setDestination(`${s.primary}${s.secondary ? `, ${s.secondary}` : ""}`);
+    setDestination(s.address);
     setSuggestions([]);
-    const g = (window as any).google;
-    const { Place } = await g.maps.importLibrary("places");
-    const place = new Place({ id: s.placeId, requestedLanguage: "pt-BR" });
-    await place.fetchFields({ fields: ["location", "formattedAddress"] });
-    const loc = place.location;
-    const ll = { lat: loc.lat(), lng: loc.lng() };
+    const ll = { lat: s.lat, lng: s.lng };
     setDestLL(ll);
-    sessionTokenRef.current = null;
-    placesReadyRef.current = false;
 
     if (!originLL) {
       toast.error("Sem localização de origem");
@@ -158,6 +135,7 @@ function PassengerHome() {
       setRouting(false);
     }
   }
+
 
   async function handleRequest() {
     if (!originLL || !destLL || !route || !category) return;
@@ -203,7 +181,7 @@ function PassengerHome() {
           center={originLL ?? undefined}
           origin={originLL ?? undefined}
           destination={destLL ?? undefined}
-          polyline={route?.polyline}
+          routeCoords={route?.coords}
         />
         <header className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-4 pt-[env(safe-area-inset-top)]">
           <button className="pointer-events-auto grid size-10 place-items-center rounded-full bg-background shadow-[var(--shadow-soft)]">

@@ -1,182 +1,112 @@
 import { useEffect, useRef } from "react";
-
-declare global {
-  interface Window {
-    google: any;
-    __rmInitMap?: () => void;
-    __rmMapReady?: Promise<void>;
-  }
-}
-
-const TRACKING_ID = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID as
-  | string
-  | undefined;
-const BROWSER_KEY = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY as
-  | string
-  | undefined;
-
-function loadMaps(): Promise<void> {
-  if (typeof window === "undefined") return Promise.resolve();
-  if (window.google?.maps) return Promise.resolve();
-  if (window.__rmMapReady) return window.__rmMapReady;
-  window.__rmMapReady = new Promise<void>((resolve) => {
-    window.__rmInitMap = () => resolve();
-    const s = document.createElement("script");
-    const params = new URLSearchParams({
-      key: BROWSER_KEY ?? "",
-      loading: "async",
-      callback: "__rmInitMap",
-      libraries: "places,geometry",
-      language: "pt-BR",
-      region: "BR",
-    });
-    if (TRACKING_ID) params.set("channel", TRACKING_ID);
-    s.src = `https://maps.googleapis.com/maps/api/js?${params.toString()}`;
-    s.async = true;
-    document.head.appendChild(s);
-  });
-  return window.__rmMapReady;
-}
-
-const darkStyle = [
-  { elementType: "geometry", stylers: [{ color: "#1d1d1d" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#1d1d1d" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#9e9e9e" }] },
-  { featureType: "poi", stylers: [{ visibility: "off" }] },
-  { featureType: "transit", stylers: [{ visibility: "off" }] },
-  { featureType: "road", elementType: "geometry", stylers: [{ color: "#2a2a2a" }] },
-  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#808080" }] },
-  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#3a3a3a" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0e0e0e" }] },
-];
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 export type LatLng = { lat: number; lng: number };
+
+// Dark tile layer via CartoDB (free, no key required)
+const TILE_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+const TILE_ATTR =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
+
+function circleIcon(color: string, ring: string) {
+  return L.divIcon({
+    className: "",
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+    html: `<div style="width:16px;height:16px;border-radius:50%;background:${color};border:2px solid ${ring};box-shadow:0 0 0 2px rgba(0,0,0,.35)"></div>`,
+  });
+}
 
 export function RealMap({
   center,
   origin,
   destination,
-  polyline,
+  routeCoords,
   className = "",
 }: {
   center?: LatLng;
   origin?: LatLng;
   destination?: LatLng;
-  polyline?: string;
+  routeCoords?: [number, number][]; // [lat, lng]
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
-  const polyRef = useRef<any>(null);
-
+  const mapRef = useRef<L.Map | null>(null);
+  const markersRef = useRef<L.Marker[]>([]);
+  const lineRef = useRef<L.Polyline | null>(null);
   const initialCenterRef = useRef(center);
+
   const lat = center?.lat;
   const lng = center?.lng;
-  const originLat = origin?.lat;
-  const originLng = origin?.lng;
-  const destLat = destination?.lat;
-  const destLng = destination?.lng;
+  const oLat = origin?.lat;
+  const oLng = origin?.lng;
+  const dLat = destination?.lat;
+  const dLng = destination?.lng;
+  const routeKey = routeCoords ? `${routeCoords.length}:${routeCoords[0]?.join(",")}` : "";
 
   useEffect(() => {
-    let cancelled = false;
-    loadMaps().then(() => {
-      if (cancelled || !ref.current || !window.google?.maps) return;
-      if (!mapRef.current) {
-        mapRef.current = new window.google.maps.Map(ref.current, {
-          center: initialCenterRef.current ?? { lat: -23.5505, lng: -46.6333 },
-          zoom: 14,
-          disableDefaultUI: true,
-          gestureHandling: "greedy",
-          styles: darkStyle,
-        });
-      }
+    if (!ref.current || mapRef.current) return;
+    const start = initialCenterRef.current ?? { lat: -23.5505, lng: -46.6333 };
+    const map = L.map(ref.current, {
+      center: [start.lat, start.lng],
+      zoom: 14,
+      zoomControl: false,
+      attributionControl: true,
     });
+    L.tileLayer(TILE_URL, { attribution: TILE_ATTR, maxZoom: 20 }).addTo(map);
+    mapRef.current = map;
     return () => {
-      cancelled = true;
+      map.remove();
+      mapRef.current = null;
     };
   }, []);
 
-  // center
   useEffect(() => {
     if (mapRef.current && lat !== undefined && lng !== undefined) {
-      mapRef.current.panTo({ lat, lng });
+      mapRef.current.panTo([lat, lng]);
     }
   }, [lat, lng]);
 
-  // markers & route
   useEffect(() => {
-    if (!mapRef.current || !window.google?.maps) return;
-    markersRef.current.forEach((m) => m.setMap(null));
+    const map = mapRef.current;
+    if (!map) return;
+    markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
-    if (polyRef.current) polyRef.current.setMap(null);
+    if (lineRef.current) {
+      lineRef.current.remove();
+      lineRef.current = null;
+    }
 
-    const g = window.google.maps;
-    const originPos =
-      originLat !== undefined && originLng !== undefined
-        ? { lat: originLat, lng: originLng }
-        : undefined;
-    const destPos =
-      destLat !== undefined && destLng !== undefined ? { lat: destLat, lng: destLng } : undefined;
-
-    if (originPos) {
+    if (oLat !== undefined && oLng !== undefined) {
       markersRef.current.push(
-        new g.Marker({
-          position: originPos,
-          map: mapRef.current,
-          icon: {
-            path: g.SymbolPath.CIRCLE,
-            scale: 8,
-            fillColor: "#22c55e",
-            fillOpacity: 1,
-            strokeColor: "#fff",
-            strokeWeight: 2,
-          },
-        }),
+        L.marker([oLat, oLng], { icon: circleIcon("#22c55e", "#fff") }).addTo(map),
       );
     }
-    if (destPos) {
+    if (dLat !== undefined && dLng !== undefined) {
       markersRef.current.push(
-        new g.Marker({
-          position: destPos,
-          map: mapRef.current,
-          icon: {
-            path: g.SymbolPath.CIRCLE,
-            scale: 8,
-            fillColor: "#FFC107",
-            fillOpacity: 1,
-            strokeColor: "#121212",
-            strokeWeight: 2,
-          },
-        }),
+        L.marker([dLat, dLng], { icon: circleIcon("#FFC107", "#121212") }).addTo(map),
       );
     }
-    if (polyline && g.geometry?.encoding) {
-      const path = g.geometry.encoding.decodePath(polyline);
-      polyRef.current = new g.Polyline({
-        path,
-        map: mapRef.current,
-        strokeColor: "#FFC107",
-        strokeWeight: 5,
-        strokeOpacity: 0.9,
-      });
-      const bounds = new g.LatLngBounds();
-      path.forEach((p: any) => bounds.extend(p));
-      mapRef.current.fitBounds(bounds, 80);
-    } else if (originPos && destPos) {
-      const bounds = new g.LatLngBounds();
-      bounds.extend(originPos);
-      bounds.extend(destPos);
-      mapRef.current.fitBounds(bounds, 80);
+    if (routeCoords && routeCoords.length > 1) {
+      lineRef.current = L.polyline(routeCoords, {
+        color: "#FFC107",
+        weight: 5,
+        opacity: 0.9,
+      }).addTo(map);
+      map.fitBounds(lineRef.current.getBounds(), { padding: [60, 60] });
+    } else if (
+      oLat !== undefined &&
+      oLng !== undefined &&
+      dLat !== undefined &&
+      dLng !== undefined
+    ) {
+      map.fitBounds(
+        L.latLngBounds([oLat, oLng], [dLat, dLng]),
+        { padding: [60, 60] },
+      );
     }
-  }, [originLat, originLng, destLat, destLng, polyline]);
+  }, [oLat, oLng, dLat, dLng, routeKey, routeCoords]);
 
-  if (!BROWSER_KEY) {
-    return (
-      <div className={`rm-map grid place-items-center text-xs text-muted-foreground ${className}`}>
-        Configure o conector Google Maps Platform
-      </div>
-    );
-  }
   return <div ref={ref} className={`rm-map ${className}`} />;
 }
