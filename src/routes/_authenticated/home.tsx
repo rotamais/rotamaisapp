@@ -6,13 +6,14 @@ import { SearchingDriver } from "@/components/SearchingDriver";
 import { NotificationBell } from "@/components/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Briefcase, Heart, Home as HomeIcon, Loader2, MapPin, Menu, Search } from "lucide-react";
+import { Briefcase, Compass, Heart, Home as HomeIcon, Loader2, MapPin, Menu, Search } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { requestRide } from "@/lib/rotamais.functions";
 import { computeRoute, reverseGeocode, searchAddress } from "@/lib/maps.functions";
 import { listSavedPlaces } from "@/lib/places.functions";
 import type { VehicleCategory } from "@/lib/pricing";
+import { useSession } from "@/hooks/useSession";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/home")({
@@ -46,6 +47,12 @@ function PassengerHome() {
   const [fare, setFare] = useState<number>(0);
   const [locating, setLocating] = useState(false);
   const [activeRideId, setActiveRideId] = useState<string | null>(null);
+  const { user } = useSession();
+  const displayName =
+    (user?.user_metadata?.full_name as string | undefined)?.split(" ")[0] ??
+    user?.email?.split("@")[0] ??
+    "por aí";
+  const avatarUrl = (user?.user_metadata?.avatar_url as string | undefined) ?? null;
 
   const requestFn = useServerFn(requestRide);
   const reverseFn = useServerFn(reverseGeocode);
@@ -173,6 +180,121 @@ function PassengerHome() {
     setSuggestions([]);
   }
 
+  if (stage === "idle") {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <header className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-3">
+          <button className="grid size-10 place-items-center rounded-full bg-muted">
+            <Menu className="size-5" />
+          </button>
+          <div className="flex items-center gap-2">
+            <span className="grid size-9 place-items-center overflow-hidden rounded-full bg-secondary text-secondary-foreground text-sm font-bold">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" className="size-full object-cover" />
+              ) : (
+                displayName.charAt(0).toUpperCase()
+              )}
+            </span>
+            <span className="text-sm font-bold">Olá, {displayName}</span>
+          </div>
+          <NotificationBell />
+        </header>
+
+        <div className="px-4">
+          <button
+            onClick={async () => {
+              if (!originLL) await locate();
+              setStage("destination");
+            }}
+            className="flex w-full items-center gap-3 rounded-2xl bg-muted px-4 py-3.5 text-left shadow-[var(--shadow-soft)]"
+          >
+            {locating ? (
+              <Loader2 className="size-4 animate-spin text-muted-foreground" />
+            ) : (
+              <Search className="size-4 text-muted-foreground" />
+            )}
+            <span className="flex-1 text-sm text-muted-foreground">
+              {locating ? "Localizando você…" : "Para onde vamos?"}
+            </span>
+            <Search className="size-4 text-muted-foreground" />
+          </button>
+
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+            {(() => {
+              const saved = (savedPlaces ?? []) as any[];
+              const home = saved.find((p) => p.icon === "home");
+              const work = saved.find((p) => p.icon === "work");
+              const pickPlace = async (p: any) => {
+                setDestination(p.address);
+                setDestLL({ lat: Number(p.lat), lng: Number(p.lng) });
+                if (!originLL) return;
+                setRouting(true);
+                try {
+                  const r = await routeFn({
+                    data: { origin: originLL, destination: { lat: Number(p.lat), lng: Number(p.lng) } },
+                  });
+                  setRoute(r);
+                  setStage("select");
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Erro ao calcular rota");
+                } finally {
+                  setRouting(false);
+                }
+              };
+              return (
+                <>
+                  <Chip
+                    icon={<HomeIcon className="size-4" />}
+                    label="Casa"
+                    onClick={() => (home ? pickPlace(home) : setStage("destination"))}
+                  />
+                  <Chip
+                    icon={<Briefcase className="size-4" />}
+                    label="Trabalho"
+                    onClick={() => (work ? pickPlace(work) : setStage("destination"))}
+                  />
+                  <Chip
+                    icon={<Compass className="size-4" />}
+                    label="Passeios"
+                    onClick={() => setStage("destination")}
+                  />
+                </>
+              );
+            })()}
+          </div>
+        </div>
+
+        <div className="relative mt-3 flex-1 overflow-hidden">
+          <RealMap
+            className="absolute inset-0 h-full w-full"
+            center={originLL ?? undefined}
+            origin={originLL ?? undefined}
+          />
+        </div>
+
+        <div className="rounded-t-3xl bg-card px-5 pt-4 pb-6 shadow-[var(--shadow-card)]">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-extrabold">Motoristas próximos</h3>
+              <p className="text-[11px] text-muted-foreground">Disponíveis por perto</p>
+            </div>
+            <button className="text-xs font-semibold text-secondary">Ver todos</button>
+          </div>
+          <div className="mt-3 flex gap-2 overflow-x-auto">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <span
+                key={i}
+                className="grid size-11 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground"
+              >
+                <Heart className="size-4" />
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative">
       <div className="relative h-[52vh] min-h-[380px] w-full">
@@ -197,69 +319,6 @@ function PassengerHome() {
       <div className="-mt-8 rounded-t-3xl bg-card p-5 shadow-[var(--shadow-card)]">
         <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-muted" />
 
-        {stage === "idle" && (
-          <>
-            <h2 className="text-xl font-extrabold">Para onde vamos?</h2>
-            <button
-              onClick={async () => {
-                if (!originLL) await locate();
-                setStage("destination");
-              }}
-              className="mt-4 flex w-full items-center gap-3 rounded-xl bg-muted px-4 py-3.5 text-left"
-            >
-              {locating ? (
-                <Loader2 className="size-4 animate-spin text-muted-foreground" />
-              ) : (
-                <Search className="size-4 text-muted-foreground" />
-              )}
-              <span className="text-sm text-muted-foreground">
-                {locating ? "Localizando você…" : "Buscar destino"}
-              </span>
-            </button>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              {(savedPlaces ?? []).slice(0, 4).map((p: any) => (
-                <button
-                  key={p.id}
-                  onClick={async () => {
-                    setDestination(p.address);
-                    setDestLL({ lat: Number(p.lat), lng: Number(p.lng) });
-                    setSuggestions([]);
-                    if (!originLL) return;
-                    setRouting(true);
-                    try {
-                      const r = await routeFn({
-                        data: { origin: originLL, destination: { lat: Number(p.lat), lng: Number(p.lng) } },
-                      });
-                      setRoute(r);
-                      setStage("select");
-                    } catch (e) {
-                      toast.error(e instanceof Error ? e.message : "Erro ao calcular rota");
-                    } finally {
-                      setRouting(false);
-                    }
-                  }}
-                  className="flex items-center gap-3 rounded-xl border border-border bg-background p-3 text-left"
-                >
-                  <span className="grid size-9 place-items-center rounded-lg bg-muted text-secondary">
-                    {p.icon === "work" ? <Briefcase className="size-4" /> : <HomeIcon className="size-4" />}
-                  </span>
-                  <span>
-                    <span className="block text-sm font-bold">{p.label}</span>
-                    <span className="block truncate text-[11px] text-muted-foreground max-w-[120px]">
-                      {p.address}
-                    </span>
-                  </span>
-                </button>
-              ))}
-              {!(savedPlaces ?? []).length && (
-                <>
-                  <Quick icon={<HomeIcon className="size-4" />} label="Casa" subtitle="Adicionar" />
-                  <Quick icon={<Briefcase className="size-4" />} label="Trabalho" subtitle="Adicionar" />
-                </>
-              )}
-            </div>
-          </>
-        )}
 
         {stage === "destination" && (
           <div className="space-y-3">
@@ -342,27 +401,26 @@ function PassengerHome() {
   );
 }
 
-function Quick({
+function Chip({
   icon,
   label,
-  subtitle,
+  onClick,
 }: {
   icon: React.ReactNode;
   label: string;
-  subtitle: string;
+  onClick?: () => void;
 }) {
   return (
-    <button className="flex items-center gap-3 rounded-xl border border-border bg-background p-3 text-left">
-      <span className="grid size-9 place-items-center rounded-lg bg-muted text-secondary">
-        {icon}
-      </span>
-      <span>
-        <span className="block text-sm font-bold">{label}</span>
-        <span className="block text-[11px] text-muted-foreground">{subtitle}</span>
-      </span>
+    <button
+      onClick={onClick}
+      className="flex shrink-0 items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold shadow-[var(--shadow-soft)]"
+    >
+      <span className="text-secondary">{icon}</span>
+      {label}
     </button>
   );
 }
+
 
 function Field({
   icon,
