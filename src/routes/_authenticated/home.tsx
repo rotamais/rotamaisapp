@@ -47,6 +47,12 @@ function PassengerHome() {
   const [fare, setFare] = useState<number>(0);
   const [locating, setLocating] = useState(false);
   const [activeRideId, setActiveRideId] = useState<string | null>(null);
+  const { user } = useSession();
+  const displayName =
+    (user?.user_metadata?.full_name as string | undefined)?.split(" ")[0] ??
+    user?.email?.split("@")[0] ??
+    "por aí";
+  const avatarUrl = (user?.user_metadata?.avatar_url as string | undefined) ?? null;
 
   const requestFn = useServerFn(requestRide);
   const reverseFn = useServerFn(reverseGeocode);
