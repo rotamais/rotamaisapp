@@ -23,17 +23,20 @@ export function RealMap({
   origin,
   destination,
   routeCoords,
+  drivers,
   className = "",
 }: {
   center?: LatLng;
   origin?: LatLng;
   destination?: LatLng;
   routeCoords?: [number, number][]; // [lat, lng]
+  drivers?: { id: string; lat: number; lng: number }[];
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
+  const driverMarkersRef = useRef<L.Marker[]>([]);
   const lineRef = useRef<L.Polyline | null>(null);
   const initialCenterRef = useRef(center);
 
@@ -108,5 +111,25 @@ export function RealMap({
     }
   }, [oLat, oLng, dLat, dLng, routeKey, routeCoords]);
 
+  const driversKey = drivers
+    ? drivers.map((d) => `${d.id}:${d.lat.toFixed(5)},${d.lng.toFixed(5)}`).join("|")
+    : "";
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    driverMarkersRef.current.forEach((m) => m.remove());
+    driverMarkersRef.current = [];
+    (drivers ?? []).forEach((d) => {
+      const icon = L.divIcon({
+        className: "",
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+        html: `<div style="width:24px;height:24px;border-radius:50%;background:#121212;border:2px solid #FFC107;display:grid;place-items:center;color:#FFC107;font-size:12px;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.35)">🚗</div>`,
+      });
+      driverMarkersRef.current.push(L.marker([d.lat, d.lng], { icon }).addTo(map));
+    });
+  }, [driversKey, drivers]);
+
   return <div ref={ref} className={`rm-map ${className}`} />;
 }
+
