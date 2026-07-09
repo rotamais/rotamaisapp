@@ -280,6 +280,7 @@ function PassengerHome() {
             className="absolute inset-0 h-full w-full"
             center={originLL ?? undefined}
             origin={originLL ?? undefined}
+            drivers={(nearbyDrivers ?? []).map((d) => ({ id: d.id, lat: d.lat, lng: d.lng }))}
           />
         </div>
 
@@ -287,21 +288,48 @@ function PassengerHome() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-extrabold">Motoristas próximos</h3>
-              <p className="text-[11px] text-muted-foreground">Disponíveis por perto</p>
+              <p className="text-[11px] text-muted-foreground">
+                {originLL
+                  ? `${nearbyDrivers?.length ?? 0} disponíveis num raio de 5 km`
+                  : "Ative a localização para ver quem está por perto"}
+              </p>
             </div>
-            <button className="text-xs font-semibold text-secondary">Ver todos</button>
+            {(nearbyDrivers?.length ?? 0) > 0 && (
+              <span className="text-xs font-semibold text-secondary">
+                {nearbyDrivers && nearbyDrivers[0]
+                  ? `${nearbyDrivers[0].distance_km.toFixed(1)} km`
+                  : ""}
+              </span>
+            )}
           </div>
           <div className="mt-3 flex gap-2 overflow-x-auto">
-            {Array.from({ length: 7 }).map((_, i) => (
-              <span
-                key={i}
-                className="grid size-11 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground"
-              >
-                <Heart className="size-4" />
-              </span>
-            ))}
+            {(nearbyDrivers ?? []).length === 0 && originLL && (
+              <p className="text-xs text-muted-foreground">
+                Nenhum motorista online no momento — tente novamente em instantes.
+              </p>
+            )}
+            {(nearbyDrivers ?? []).map((d) => {
+              const initial = (d.full_name ?? "?").trim().charAt(0).toUpperCase() || "?";
+              return (
+                <div key={d.id} className="flex w-14 shrink-0 flex-col items-center gap-1">
+                  <span className="grid size-11 place-items-center overflow-hidden rounded-full bg-muted text-sm font-bold text-secondary">
+                    {d.avatar_url ? (
+                      <img src={d.avatar_url} alt="" className="size-full object-cover" />
+                    ) : (
+                      initial
+                    )}
+                  </span>
+                  <span className="w-full truncate text-center text-[10px] text-muted-foreground">
+                    {d.distance_km < 1
+                      ? `${Math.round(d.distance_km * 1000)} m`
+                      : `${d.distance_km.toFixed(1)} km`}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
+
       </div>
     );
   }
