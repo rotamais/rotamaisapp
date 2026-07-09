@@ -401,27 +401,26 @@ function PassengerHome() {
   );
 }
 
-function Quick({
+function Chip({
   icon,
   label,
-  subtitle,
+  onClick,
 }: {
   icon: React.ReactNode;
   label: string;
-  subtitle: string;
+  onClick?: () => void;
 }) {
   return (
-    <button className="flex items-center gap-3 rounded-xl border border-border bg-background p-3 text-left">
-      <span className="grid size-9 place-items-center rounded-lg bg-muted text-secondary">
-        {icon}
-      </span>
-      <span>
-        <span className="block text-sm font-bold">{label}</span>
-        <span className="block text-[11px] text-muted-foreground">{subtitle}</span>
-      </span>
+    <button
+      onClick={onClick}
+      className="flex shrink-0 items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold shadow-[var(--shadow-soft)]"
+    >
+      <span className="text-secondary">{icon}</span>
+      {label}
     </button>
   );
 }
+
 
 function Field({
   icon,
