@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { requestRide } from "@/lib/rotamais.functions";
 import { computeRoute, reverseGeocode, searchAddress } from "@/lib/maps.functions";
 import { listSavedPlaces } from "@/lib/places.functions";
+import { listNearbyDrivers, type NearbyDriver } from "@/lib/nearby-drivers.functions";
 import type { VehicleCategory } from "@/lib/pricing";
 import { useSession } from "@/hooks/useSession";
 import { toast } from "sonner";
