@@ -23,17 +23,20 @@ export function RealMap({
   origin,
   destination,
   routeCoords,
+  drivers,
   className = "",
 }: {
   center?: LatLng;
   origin?: LatLng;
   destination?: LatLng;
   routeCoords?: [number, number][]; // [lat, lng]
+  drivers?: { id: string; lat: number; lng: number }[];
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
+  const driverMarkersRef = useRef<L.Marker[]>([]);
   const lineRef = useRef<L.Polyline | null>(null);
   const initialCenterRef = useRef(center);
 
