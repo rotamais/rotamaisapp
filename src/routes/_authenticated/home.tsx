@@ -60,10 +60,20 @@ function PassengerHome() {
   const routeFn = useServerFn(computeRoute);
   const placesFn = useServerFn(listSavedPlaces);
   const searchFn = useServerFn(searchAddress);
+  const nearbyFn = useServerFn(listNearbyDrivers);
 
   const { data: savedPlaces } = useQuery({
     queryKey: ["saved-places"],
     queryFn: () => placesFn(),
+  });
+
+  const { data: nearbyDrivers } = useQuery<NearbyDriver[]>({
+    queryKey: ["nearby-drivers", originLL?.lat, originLL?.lng],
+    queryFn: () =>
+      nearbyFn({ data: { lat: originLL!.lat, lng: originLL!.lng, radiusKm: 5, limit: 12 } }),
+    enabled: !!originLL,
+    refetchInterval: 15000,
+    staleTime: 10000,
   });
 
   // Pega localização atual no mount
