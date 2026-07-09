@@ -6,13 +6,14 @@ import { SearchingDriver } from "@/components/SearchingDriver";
 import { NotificationBell } from "@/components/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Briefcase, Heart, Home as HomeIcon, Loader2, MapPin, Menu, Search } from "lucide-react";
+import { Briefcase, Compass, Heart, Home as HomeIcon, Loader2, MapPin, Menu, Search } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { requestRide } from "@/lib/rotamais.functions";
 import { computeRoute, reverseGeocode, searchAddress } from "@/lib/maps.functions";
 import { listSavedPlaces } from "@/lib/places.functions";
 import type { VehicleCategory } from "@/lib/pricing";
+import { useSession } from "@/hooks/useSession";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/home")({
