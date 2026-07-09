@@ -895,6 +895,22 @@ export type Database = {
         }
         Returns: boolean
       }
+      nearby_drivers: {
+        Args: {
+          _lat: number
+          _limit?: number
+          _lng: number
+          _radius_km?: number
+        }
+        Returns: {
+          distance_km: number
+          id: string
+          lat: number
+          lng: number
+          rating: number
+          total_trips: number
+        }[]
+      }
     }
     Enums: {
       app_role: "passenger" | "driver" | "admin" | "fleet_operator"
